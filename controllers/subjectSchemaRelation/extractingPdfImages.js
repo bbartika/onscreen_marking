@@ -1,41 +1,70 @@
-import fs from 'fs';
-import path from 'path';
-import poppler from 'pdf-poppler';
+import fs from "fs";
+import path from "path";
+import { spawn } from "child_process";
 
-
-/* -------------------------------------------------------------------------- */
-/*                             EXTRACT PDF IMAGES                             */
-/* -------------------------------------------------------------------------- */
-const extractImagesFromPdf = async (pdfPath, outputDir) => {
-    if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
+const extractImagesFromPdf = (pdfPath, outputDir) => {
+  return new Promise((resolve, reject) => {
+    if (!fs.existsSync(pdfPath)) {
+      return reject(new Error("PDF file not found"));
     }
 
-    const options = {
-        format: 'png',
-        out_dir: outputDir,
-        out_prefix: path.basename(pdfPath, path.extname(pdfPath)),
-        page: null
-    };
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
 
-    try {
-        await poppler.convert(pdfPath, options);
+    const outputPrefix = path.join(outputDir, "page");
 
-        const images = fs.readdirSync(outputDir);
+    const poppler = spawn("pdftoppm", [
+      "-png",
+      "-r",
+      "300",      // high quality DPI
+      pdfPath,
+      outputPrefix,
+    ]);
 
-        images.forEach((image, index) => {
-            const oldPath = path.join(outputDir, image);
-            const newPath = path.join(outputDir, `image_${index + 1}.png`);
-            fs.renameSync(oldPath, newPath);
+    let stderr = "";
+
+    poppler.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    poppler.on("error", () => {
+      reject(new Error("Failed to start Poppler process"));
+    });
+
+    poppler.on("close", (code) => {
+      if (code !== 0) {
+        return reject(
+          new Error(`Poppler failed with code ${code}: ${stderr}`)
+        );
+      }
+
+      const images = fs
+        .readdirSync(outputDir)
+        .filter(
+          (file) =>
+            file.startsWith("page") && file.toLowerCase().endsWith(".png")
+        )
+        .sort((a, b) => {
+          const nA = parseInt(a.match(/\d+/)[0], 10);
+          const nB = parseInt(b.match(/\d+/)[0], 10);
+          return nA - nB;
         });
 
-        return images.length;
-    } catch (error) {
-        console.error("Error extracting images from PDF:", error);
-        throw new Error("Failed to extract images from PDF.");
-    }
+      const finalImages = [];
+
+      images.forEach((file, index) => {
+        const oldPath = path.join(outputDir, file);
+        const newName = `image_${index + 1}.png`;
+        const newPath = path.join(outputDir, newName);
+
+        fs.renameSync(oldPath, newPath);
+        finalImages.push(newName);
+      });
+
+      resolve(finalImages); // ← array in correct order
+    });
+  });
 };
-
-
 
 export default extractImagesFromPdf;
