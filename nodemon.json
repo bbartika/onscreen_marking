@@ -1,0 +1,10 @@
+{
+  "watch": ["server.js", "controllers", "routes", "models", "utils"],
+  "ignore": [
+    "Annotations/*",
+    "Annotations/**/*.json",
+    "marks.json",
+    "marksData.json",
+    "questionMarksData.json"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "annotations": [
+    {
+      "id": "12/15/2025, 4:20:40 PM",
+      "taskId": "693b993e661b0bdc44d8038f",
+      "page": "14",
+      "answerPdfImageId": "693fb65772ee8895f5762b74",
+      "answerPdfId": "693b993e661b0bdc44d80391",
+      "userId": "693a9fc22571b1f2f9194d42",
+      "iconUrl": "/blank.jpg",
+      "question": 2,
+      "timeStamps": "12/15/2025, 4:20:40 PM",
+      "x": 44.703125,
+      "y": 463.46875,
+      "width": 150,
+      "height": 80,
+      "synced": false,
+      "mark": 0
+    }
+  ],
+  "comments": [
+    {
+      "id": 1765795824799,
+      "taskId": "693b993e661b0bdc44d8038f",
+      "page": "14",
+      "answerPdfId": "693b993e661b0bdc44d80391",
+      "text": "",
+      "x": 611.703125,
+      "y": 737.46875,
+      "width": 150,
+      "height": 60,
+      "synced": false
+    }
+  ]
+}

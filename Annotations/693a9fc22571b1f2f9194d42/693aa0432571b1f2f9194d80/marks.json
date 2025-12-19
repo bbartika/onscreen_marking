@@ -1,0 +1,59 @@
+{
+  "marks": [
+    {
+      "id": "12/12/2025, 11:53:11 AM",
+      "taskId": "693aa0432571b1f2f9194d7e",
+      "page": "2",
+      "answerPdfId": "693aa0432571b1f2f9194d80",
+      "questionDefinitionId": "693a9ee175b47c9b419a48cc",
+      "question": 1,
+      "allottedMarks": 1,
+      "timeStamps": "12/12/2025, 11:53:11 AM",
+      "synced": false
+    },
+    {
+      "id": "12/12/2025, 11:53:16 AM",
+      "taskId": "693aa0432571b1f2f9194d7e",
+      "page": "3",
+      "answerPdfId": "693aa0432571b1f2f9194d80",
+      "questionDefinitionId": "693a9ee875b47c9b419a48d4",
+      "question": 2,
+      "allottedMarks": 1,
+      "timeStamps": "12/12/2025, 11:53:16 AM",
+      "synced": false
+    },
+    {
+      "id": "12/12/2025, 11:53:20 AM",
+      "taskId": "693aa0432571b1f2f9194d7e",
+      "page": "4",
+      "answerPdfId": "693aa0432571b1f2f9194d80",
+      "questionDefinitionId": "693a9eee75b47c9b419a48dc",
+      "question": 3,
+      "allottedMarks": 1,
+      "timeStamps": "12/12/2025, 11:53:20 AM",
+      "synced": false
+    },
+    {
+      "id": "12/12/2025, 11:53:24 AM",
+      "taskId": "693aa0432571b1f2f9194d7e",
+      "page": "5",
+      "answerPdfId": "693aa0432571b1f2f9194d80",
+      "questionDefinitionId": "693a9ef775b47c9b419a48e4",
+      "question": 4,
+      "allottedMarks": 1,
+      "timeStamps": "12/12/2025, 11:53:24 AM",
+      "synced": false
+    },
+    {
+      "id": "12/12/2025, 11:53:27 AM",
+      "taskId": "693aa0432571b1f2f9194d7e",
+      "page": "6",
+      "answerPdfId": "693aa0432571b1f2f9194d80",
+      "questionDefinitionId": "693a9efe75b47c9b419a48ec",
+      "question": 5,
+      "allottedMarks": 1,
+      "timeStamps": "12/12/2025, 11:53:27 AM",
+      "synced": false
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "annotations": [
+    {
+      "id": "12/12/2025, 11:53:35 AM",
+      "taskId": "693aa0432571b1f2f9194d7e",
+      "page": "8",
+      "answerPdfImageId": "693bb4c678bdd120881153c0",
+      "answerPdfId": "693aa0432571b1f2f9194d80",
+      "userId": "693a9fc22571b1f2f9194d42",
+      "questionDefinitionId": "693a9efe75b47c9b419a48ec",
+      "iconUrl": "/blank.jpg",
+      "question": 5,
+      "timeStamps": "12/12/2025, 11:53:35 AM",
+      "x": 292.203125,
+      "y": 299.46875,
+      "width": 150,
+      "height": 80,
+      "synced": false,
+      "mark": 0
+    }
+  ],
+  "comments": []
+}
