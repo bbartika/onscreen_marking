@@ -16,8 +16,11 @@ const extractImagesFromPdf = (pdfPath, outputDir) => {
 
     const poppler = spawn("pdftoppm", [
       "-png",
-      "-r",
-      "300",      // high quality DPI
+      "-scale-to-x",
+  "1200",
+  "-scale-to-y",
+  "-1",
+           // high quality DPI
       pdfPath,
       outputPrefix,
     ]);
