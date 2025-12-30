@@ -1,0 +1,81 @@
+{
+  "marks": [
+    {
+      "id": "12/30/2025, 10:23:33 AM",
+      "taskId": "69535527c7a12c69028e4d11",
+      "page": "3",
+      "answerPdfId": "69535527c7a12c69028e4d14",
+      "questionDefinitionId": "69523858d49018a62d88b577",
+      "question": 1,
+      "allottedMarks": 2,
+      "timeStamps": "12/30/2025, 10:23:33 AM",
+      "synced": false
+    },
+    {
+      "id": "12/30/2025, 10:23:40 AM",
+      "taskId": "69535527c7a12c69028e4d11",
+      "page": "4",
+      "answerPdfId": "69535527c7a12c69028e4d14",
+      "questionDefinitionId": "69523867d49018a62d88b58d",
+      "question": 2,
+      "allottedMarks": 4,
+      "timeStamps": "12/30/2025, 10:23:40 AM",
+      "synced": false
+    },
+    {
+      "id": "12/30/2025, 10:24:01 AM",
+      "taskId": "69535527c7a12c69028e4d11",
+      "page": "6",
+      "answerPdfId": "69535527c7a12c69028e4d14",
+      "questionDefinitionId": "695238bbd49018a62d88b5f9",
+      "question": 5,
+      "allottedMarks": 2,
+      "timeStamps": "12/30/2025, 10:24:01 AM",
+      "synced": false
+    },
+    {
+      "id": "12/30/2025, 10:24:06 AM",
+      "taskId": "69535527c7a12c69028e4d11",
+      "page": "7",
+      "answerPdfId": "69535527c7a12c69028e4d14",
+      "questionDefinitionId": "695238c3d49018a62d88b60f",
+      "question": 6,
+      "allottedMarks": 8,
+      "timeStamps": "12/30/2025, 10:24:06 AM",
+      "synced": false
+    },
+    {
+      "id": "12/30/2025, 10:24:13 AM",
+      "taskId": "69535527c7a12c69028e4d11",
+      "page": "8",
+      "answerPdfId": "69535527c7a12c69028e4d14",
+      "questionDefinitionId": "695238d9d49018a62d88b62b",
+      "question": 7,
+      "allottedMarks": 1,
+      "timeStamps": "12/30/2025, 10:24:13 AM",
+      "synced": false
+    },
+    {
+      "id": "12/30/2025, 10:24:20 AM",
+      "taskId": "69535527c7a12c69028e4d11",
+      "page": "9",
+      "answerPdfId": "69535527c7a12c69028e4d14",
+      "questionDefinitionId": "695238e5d49018a62d88b653",
+      "question": 8,
+      "allottedMarks": 4,
+      "timeStamps": "12/30/2025, 10:24:20 AM",
+      "synced": false
+    },
+    {
+      "id": "12/30/2025, 10:24:25 AM",
+      "taskId": "69535527c7a12c69028e4d11",
+      "page": "10",
+      "answerPdfId": "69535527c7a12c69028e4d14",
+      "questionDefinitionId": "695238f1d49018a62d88b65d",
+      "question": 9,
+      "allottedMarks": 2,
+      "timeStamps": "12/30/2025, 10:24:25 AM",
+      "synced": false
+    }
+  ]
+}

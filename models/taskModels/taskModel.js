@@ -34,7 +34,11 @@ const taskSchema = new mongoose.Schema({
     lastResumedAt: {
         type: Date,
         default: null
-    }
+    },
+    efficiency: {
+    type: [Number],
+    default: []
+  }
 });
 
 const Task = mongoose.model("Task", taskSchema);

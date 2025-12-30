@@ -26,6 +26,14 @@ const schemaSchema = new mongoose.Schema({
         required: true,
         min: [0, "Minimum marks cannot be negative."]
     },
+    minTime:{
+        type: Number,
+        required: true,
+    },
+    maxTime:{
+        type: Number,
+        required: true,
+    },
     compulsoryQuestions: {
         type: Number,
         default: 0,
@@ -35,11 +43,7 @@ const schemaSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-    evaluationTime: {
-        type: Number,
-        required: true,
-        min: [1, "Evaluation time must be at least 1."]
-    },
+    
     numberOfPage: {
         type: Number,
         require: true

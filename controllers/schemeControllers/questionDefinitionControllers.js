@@ -2,6 +2,7 @@ import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchem
 import { validateQuestionDefinition } from "../../errorHanding/validateQuestionDefinition.js";
 import Schema from "../../models/schemeModel/schema.js";
 import { isValidObjectId } from "../../services/mongoIdValidation.js";
+import mongoose from "mongoose";
 
 /* -------------------------------------------------------------------------- */
 /*                           CREATE QUESTION DEFINITION                       */
@@ -128,6 +129,7 @@ const updateQuestionDefinition = async (req, res) => {
 
         if (parentQuestionId && !isValidObjectId(parentQuestionId)) {
             return res.status(400).json({ message: "Invalid parentQuestionId." });
+            
         }
 
         // Check if the question definition exists
@@ -244,6 +246,9 @@ const getQuestionDefinitionById = async (req, res) => {
         if (questionDefinition.isSubQuestion) {
             subQuestions = await QuestionDefinition.find({ parentQuestionId: id });
         }
+        console.log("questionDefinition:", questionDefinition);
+
+        console.log("subQuestions:", subQuestions);
 
         return res.status(200).json({
             message: "Question definition retrieved successfully.",
@@ -277,13 +282,22 @@ const getAllPrimaryQuestionBasedOnSchemeId = async (req, res) => {
             parentQuestionId: null,
         });
 
+        console.log("primaryQuestions:", primaryQuestions);
+
+        const subQuestionsMap = await QuestionDefinition.find({
+                schemaId: new mongoose.Types.ObjectId(schemaId),
+                parentQuestionId: { $ne: null }
+            });
+
+            console.log("subQuestionsMap:", subQuestionsMap);
+
         if (primaryQuestions.length === 0) {
             return res.status(200).json({ message: "No primary questions found for the given schemaId.", data: [] });
         }
 
         return res.status(200).json({
             message: "Primary questions retrieved successfully.",
-            data: primaryQuestions,
+            data: primaryQuestions,subQuestionsMap
         });
     } catch (error) {
         console.error(error);

@@ -13,11 +13,11 @@
       "numberOfSubQuestions": 0,
       "compulsorySubQuestions": 0,
       "__v": 0,
-      "allottedMarks": 1,
+      "allottedMarks": 0,
       "answerPdfId": "693aa0432571b1f2f9194d80",
       "timerStamps": "",
       "isMarked": true,
-      "updatedAt": "2025-12-12T06:23:11.547Z"
+      "updatedAt": "2025-12-27T11:00:23.111Z"
     },
     {
       "_id": "693a9ee875b47c9b419a48d4",
@@ -32,11 +32,11 @@
       "numberOfSubQuestions": 0,
       "compulsorySubQuestions": 0,
       "__v": 0,
-      "allottedMarks": 1,
+      "allottedMarks": 0,
       "answerPdfId": "693aa0432571b1f2f9194d80",
       "timerStamps": "",
       "isMarked": true,
-      "updatedAt": "2025-12-12T06:23:16.519Z"
+      "updatedAt": "2025-12-24T04:30:54.965Z"
     },
     {
       "_id": "693a9eee75b47c9b419a48dc",
@@ -51,11 +51,11 @@
       "numberOfSubQuestions": 0,
       "compulsorySubQuestions": 0,
       "__v": 0,
-      "allottedMarks": 1,
+      "allottedMarks": 0,
       "answerPdfId": "693aa0432571b1f2f9194d80",
       "timerStamps": "",
       "isMarked": true,
-      "updatedAt": "2025-12-12T06:23:20.512Z"
+      "updatedAt": "2025-12-24T04:30:46.278Z"
     },
     {
       "_id": "693a9ef775b47c9b419a48e4",
@@ -70,11 +70,11 @@
       "numberOfSubQuestions": 0,
       "compulsorySubQuestions": 0,
       "__v": 0,
-      "allottedMarks": 1,
+      "allottedMarks": 0,
       "answerPdfId": "693aa0432571b1f2f9194d80",
       "timerStamps": "",
       "isMarked": true,
-      "updatedAt": "2025-12-12T06:23:24.911Z"
+      "updatedAt": "2025-12-24T04:30:51.748Z"
     },
     {
       "_id": "693a9efe75b47c9b419a48ec",
@@ -93,8 +93,8 @@
       "answerPdfId": "693aa0432571b1f2f9194d80",
       "timerStamps": "",
       "isMarked": true,
-      "updatedAt": "2025-12-22T04:43:23.174Z"
+      "updatedAt": "2025-12-24T04:30:57.013Z"
     }
   ],
-  "lastSaved": "2025-12-22T04:43:23.174Z"
+  "lastSaved": "2025-12-27T11:00:23.111Z"
 }

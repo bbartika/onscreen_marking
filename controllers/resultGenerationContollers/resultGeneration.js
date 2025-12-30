@@ -313,6 +313,8 @@ const getCompletedBooklets = async (req, res) => {
 
     const booklets = await AnswerPdf.find({ taskId: id, status: true });
 
+    
+
     if (booklets.length === 0) {
       return res.status(404).json({ message: "No completed booklets found" });
     }

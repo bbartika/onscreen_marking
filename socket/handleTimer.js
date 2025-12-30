@@ -61,7 +61,8 @@ export default function handleTimerSocket(io) {
           throw new Error("Schema not found.");
         }
 
-        const evaluationTime = schemaDetails.evaluationTime; // in seconds
+        const minTime = schemaDetails.minTime; // in seconds
+        const maxTime = schemaDetails.maxTime; // in seconds
 
         // Check if timer exists in Redis
         const existingTimer = await redisClient.get(timerKey);
@@ -72,8 +73,8 @@ export default function handleTimerSocket(io) {
           const timerData = {
             taskId,
             answerPdfId,
-            totalTime: evaluationTime,
-            remainingTime: evaluationTime,
+            totalTime: maxTime,
+            remainingTime: maxTime,
 
             startTime: Date.now(),
             lastUpdated: Date.now(),

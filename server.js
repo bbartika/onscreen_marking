@@ -18,9 +18,9 @@ import subjectQuestionRelationRoutes from "./routes/subjectSchemaRelationRoutes/
 import coordinateAllocation from "./routes/subjectSchemaRelationRoutes/coordinateAllocationRoutes.js";
 import taskRoutes from "./routes/taskRoutes/taskRoutes.js";
 // import syncfusionController from "./controllers/syncfusionController/sycnfusionController.js";
-import answerPdfImageRoutes from './routes/evaluationRoutes/answerPdfImageRoutes.js'
+import answerPdfImageRoutes from './routes/evaluationRoutes/answerPdfImageRoutes.js';
 import marksRoutes from './routes/evaluationRoutes/marksRoutes.js';
-import iconRoutes from './routes/evaluationRoutes/iconRoutes.js'
+import iconRoutes from './routes/evaluationRoutes/iconRoutes.js';
 import { subjectFolderWatcher } from "./controllers/studentControllers/subjectFolder.js";
 import bookletProcessingRoutes from "./routes/bookletProcessingRoutes/bookletProcessingRoutes.js";
 import resultGenerationRoutes from "./routes/resultGenerationRoutes/resultGenerationRoutes.js";
@@ -51,6 +51,7 @@ export const io = new Server(server, {
 });
 const PORT = process.env.PORT || 5000;
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
 

@@ -548,7 +548,7 @@ const processingBookletsBySocket = async (req, res) => {
           return;
         }
 
-        fs.mkdirSync(processedFolderPath, { recursive: true });
+        fs.mkdirSync(processedFolderPath, { recursive: true }); 
         fs.mkdirSync(rejectedFolderPath, { recursive: true });
 
         let pdfFiles = fs
@@ -780,6 +780,8 @@ const removeRejectedBooklets = async (req, res) => {
         fs.unlinkSync(scannedFilePath); // Remove scanned file
       }
     });
+
+    
 
     // Send success response
     res.status(200).json({

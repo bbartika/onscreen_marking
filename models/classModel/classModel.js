@@ -51,11 +51,13 @@ const courseSchema = new mongoose.Schema({
     }
 });
 
-courseSchema.pre('save', function (next) {
+courseSchema.pre('save', function () {
     this.updatedAt = Date.now();
-    next();
+    // next();
 });
 
 const Course = mongoose.model('Course', courseSchema);
 
 export default Course;
+
+

@@ -429,7 +429,7 @@ const autoAssigning = async (req, res) => {
       )?.unAllocated ?? 0;
     console.log("previousUnallocated", previousUnallocated);
 
-    let unAllocated = 0;;
+    let unAllocated = 0;
 
     if (previousUnallocated === 0) {
       unAllocated = newPdfs.length - totalAssigned;
@@ -719,7 +719,8 @@ const getAssignTaskById = async (req, res) => {
       return res.status(404).json({ message: "Schema not found." });
     }
 
-    const evaluationTime = schemaDetails.evaluationTime; // in minutes
+    const minTime = schemaDetails.minTime; // in minutes
+    const maxTime = schemaDetails.maxTime; // in minutes
 
     // --- Utility: format seconds to HH:mm:ss ---
     const formatSecondsToHHMMSS = (totalSeconds) => {
@@ -745,11 +746,11 @@ const getAssignTaskById = async (req, res) => {
         (new Date() - task.lastResumedAt) / 1000
       );
       remainingSeconds = Math.max(
-        (task.remainingTimeInSec ?? evaluationTime * 60) - elapsedSeconds,
+        (task.remainingTimeInSec ?? maxTime * 60) - elapsedSeconds,
         0
       );
     } else {
-      remainingSeconds = evaluationTime * 60;
+      remainingSeconds =maxTime * 60;
     }
 
     const rootFolder = path.join(__dirname, "processedFolder");
@@ -1286,7 +1287,62 @@ const getUsersFormanualAssign = async (req, res) => {
 
 const completedBookletHandler = async (req, res) => {
   try {
-    const { answerpdfid, userId } = req.params;
+    const { answerpdfid, userId, submitted } = req.params;
+
+    const taskId = await AnswerPdf.findById(answerpdfid)
+      .select("taskId")
+      .lean();
+
+      console.log("taskId", taskId);
+
+    const subjectCode = await Task.findById(taskId)
+      .select("subjectCode")
+      .lean();
+
+      console.log("subjectCode", subjectCode);
+
+    const subjectName = await Subject
+      .findOne({ code: subjectCode })
+      .select("name")
+      .lean();
+
+      console.log("subjectName", subjectName);
+
+    const { minTime, maxTime } = await Schema
+      .findOne({ name: subjectName })
+      .select("minTime maxTime")
+      .lean();
+
+    console.log("minTime, maxTime", minTime, maxTime);
+    
+    const effectiveTime = Math.max(minTime, submitted);
+
+    const efficiency = Math.max(
+      0,
+      Math.min(
+        100,
+        Math.round(((maxTime - effectiveTime) / (maxTime - minTime)) * 100)
+      )
+    );
+
+    // 6️⃣ PUSH efficiency into array
+    await Task.updateOne(
+      {
+        _id: taskId,
+        userId,
+        subjectCode,
+      },  
+      {
+        $push: { efficiency },
+      }
+    );
+
+    await User.updateOne(
+      { _id: userId },
+      {
+        $push: { efficiency },
+      } 
+    )
 
     if (!answerpdfid) {
       return res.status(400).json({
@@ -1295,9 +1351,13 @@ const completedBookletHandler = async (req, res) => {
       });
     }
 
-    console.log("📘 Starting sync for booklet:", answerpdfid);
+    console.log("Starting sync for booklet:", answerpdfid);
 
-    const folderPath = path.join("Annotations", String(userId), String(answerpdfid));
+    const folderPath = path.join(
+      "Annotations",
+      String(userId),
+      String(answerpdfid)
+    );
 
     if (!fs.existsSync(folderPath)) {
       return res.status(404).json({
@@ -1440,6 +1500,7 @@ const completedBookletHandler = async (req, res) => {
         taskId: currentTask._id,
         status: true,
       });
+      
       totalBooklets += currentTask.totalBooklets;
       console.log("total booklets", currentTask.totalBooklets);
 

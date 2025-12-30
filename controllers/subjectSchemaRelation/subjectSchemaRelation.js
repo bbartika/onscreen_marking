@@ -14,6 +14,8 @@ import extractImagesFromPdf from "../../services/extractImagesFromPdf.js"
 const createSubjectSchemaRelation = async (req, res) => {
     const { schemaId, subjectId, relationName } = req.body;
 
+    console.log("Request Body:", req.body);
+
     try {
         // Validate incoming data
         if (!schemaId || !subjectId || !req.files?.questionPdf || !req.files?.answerPdf) {
@@ -45,6 +47,8 @@ const createSubjectSchemaRelation = async (req, res) => {
 
         // Remove any existing SubjectSchemaRelation with the same schemaId and subjectId
         const existingRelation = await SubjectSchemaRelation.findOne({ schemaId, subjectId });
+
+        console.log("Existing Relation:", existingRelation);
 
         if (existingRelation) {
             // Delete associated files
@@ -90,8 +94,22 @@ const createSubjectSchemaRelation = async (req, res) => {
         const questionPdf = req.files.questionPdf[0];
         const answerPdf = req.files.answerPdf[0];
 
+        if (!fs.existsSync(questionPdf.path)) {
+  throw new Error(`Question PDF missing at ${questionPdf.path}`);
+}
+
+if (!fs.existsSync(answerPdf.path)) {
+  throw new Error(`Answer PDF missing at ${answerPdf.path}`);
+}
+ console.log("questionpdfDir", questionPdfDir);
+ console.log("answerPdfDir", answerPdfDir);
+
+
         const questionPdfPath = path.join(questionPdfDir, questionPdf.filename);
         const answerPdfPath = path.join(answerPdfDir, answerPdf.filename);
+
+        console.log("Q temp:", questionPdf.path);
+        console.log("A temp:", answerPdf.path);
 
         try {
             fs.renameSync(questionPdf.path, questionPdfPath);
@@ -108,9 +126,13 @@ const createSubjectSchemaRelation = async (req, res) => {
         ensureDir(questionImageSubDir);
         ensureDir(answerImageSubDir);
 
-        const questionImageCount = await extractImagesFromPdf(questionPdfPath, questionImageSubDir);
-        const answerImageCount = await extractImagesFromPdf(answerPdfPath, answerImageSubDir);
+        const questionImage = await extractImagesFromPdf(questionPdfPath, questionImageSubDir);
+        const questionImageCount = questionImage.length;
+        console.log("Question Image Count:", questionImageCount);
 
+        const answerImage = await extractImagesFromPdf(answerPdfPath, answerImageSubDir);
+        const answerImageCount = answerImage.length;
+        console.log("Answer Image Count:", answerImageCount);
         // Create the new SubjectSchemaRelation document
         const newSubjectSchemaRelation = new SubjectSchemaRelation({
             schemaId,
