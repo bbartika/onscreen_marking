@@ -17,8 +17,9 @@ import authMiddleware from "../../Middlewares/authMiddleware.js";
 /* -------------------------------------------------------------------------- */
 
 router.post("/create/questiondefinition", authMiddleware, createQuestionDefinition);
+router.delete("/delete/questiondefinition/:id", authMiddleware, removeQuestionDefinition);
 router.put('/update/questiondefinition/:id', authMiddleware, updateQuestionDefinition);
-router.delete("/remove/questiondefinition/:id", authMiddleware, removeQuestionDefinition);
+// router.delete("/remove/questiondefinition/:id", authMiddleware, removeQuestionDefinition);
 router.get('/get/questiondefinition/:id', authMiddleware, getQuestionDefinitionById);
 router.get("/getall/questiondefinitions/:schemaId", authMiddleware, getAllPrimaryQuestionBasedOnSchemeId);
 
