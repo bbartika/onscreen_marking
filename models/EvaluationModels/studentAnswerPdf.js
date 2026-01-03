@@ -12,7 +12,12 @@ const studentAnswerPdf = new mongoose.Schema({
     },
     status: {
         type: Boolean,
-        detault: false
+        default: false
+    },
+    assignedDate: {
+        type: Date,
+        required: true,
+        index: true
     }
 });
 

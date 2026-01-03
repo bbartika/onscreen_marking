@@ -35,6 +35,7 @@ const createQuestionDefinition = async (req, res) => {
             compulsorySubQuestions,
         });
 
+        
 
         if (!isValidObjectId(schemaId)) {
             return res.status(400).json({ message: "Invalid schemaId." });

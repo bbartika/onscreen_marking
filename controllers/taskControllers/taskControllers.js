@@ -106,27 +106,37 @@ const assigningTask = async (req, res) => {
 
     console.log("taskIds", taskIds);
 
-    const result = await AnswerPdf.aggregate([
-      { $match: { status: false, taskId: { $in: taskIds } } },
-      { $group: { _id: "$taskId" } },
-      { $count: "uniqueCount" },
-    ]);
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
 
-    const previouslyAssigned = result[0]?.uniqueCount || 0;
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
 
-    console.log(previouslyAssigned); // 9
+    
 
-    console.log("previouslyAssigned", previouslyAssigned);
+    const todayPending = await AnswerPdf.countDocuments({
+      taskId: { $in: taskIds },
+      status: false,
+      assignedDate: { $gte: startOfDay, $lte: endOfDay },
+    }).session(session);
 
-    console.log(
-      "current status",
-      Number(bookletsToAssign) + previouslyAssigned
-    );
+    
+
+    
 
     // validate total assignment limit
-    if (previouslyAssigned + Number(bookletsToAssign) > user.maxBooklets) {
+    // if (previouslyAssigned + Number(bookletsToAssign) > user.maxBooklets) {
+    //   return res.status(400).json({
+    //     message: `User can be assigned maximum ${user.maxBooklets} booklets. Already assigned ${previouslyAssigned}, requested ${bookletsToAssign}.`,
+    //   });
+    // }
+
+    const dailyLimit = user.maxBooklets; // per-day limit
+    const availableToday = Math.max(0, dailyLimit - todayPending);
+
+    if (Number(bookletsToAssign) > availableToday) {
       return res.status(400).json({
-        message: `User can be assigned maximum ${user.maxBooklets} booklets. Already assigned ${previouslyAssigned}, requested ${bookletsToAssign}.`,
+        message: `Daily limit exceeded. Available today: ${availableToday}, requested: ${bookletsToAssign}`,
       });
     }
 
@@ -166,6 +176,7 @@ const assigningTask = async (req, res) => {
       taskId: task._id,
       answerPdfName: pdf,
       status: false,
+      assignedDate: new Date()
     }));
 
     await AnswerPdf.insertMany(answerPdfDocs, { session });
@@ -750,7 +761,7 @@ const getAssignTaskById = async (req, res) => {
         0
       );
     } else {
-      remainingSeconds =maxTime * 60;
+      remainingSeconds = maxTime * 60;
     }
 
     const rootFolder = path.join(__dirname, "processedFolder");
@@ -1293,28 +1304,26 @@ const completedBookletHandler = async (req, res) => {
       .select("taskId")
       .lean();
 
-      console.log("taskId", taskId);
+    console.log("taskId", taskId);
 
     const subjectCode = await Task.findById(taskId)
       .select("subjectCode")
       .lean();
 
-      console.log("subjectCode", subjectCode);
+    console.log("subjectCode", subjectCode);
 
-    const subjectName = await Subject
-      .findOne({ code: subjectCode })
+    const subjectName = await Subject.findOne({ code: subjectCode })
       .select("name")
       .lean();
 
-      console.log("subjectName", subjectName);
+    console.log("subjectName", subjectName);
 
-    const { minTime, maxTime } = await Schema
-      .findOne({ name: subjectName })
+    const { minTime, maxTime } = await Schema.findOne({ name: subjectName })
       .select("minTime maxTime")
       .lean();
 
     console.log("minTime, maxTime", minTime, maxTime);
-    
+
     const effectiveTime = Math.max(minTime, submitted);
 
     const efficiency = Math.max(
@@ -1331,7 +1340,7 @@ const completedBookletHandler = async (req, res) => {
         _id: taskId,
         userId,
         subjectCode,
-      },  
+      },
       {
         $push: { efficiency },
       }
@@ -1341,8 +1350,8 @@ const completedBookletHandler = async (req, res) => {
       { _id: userId },
       {
         $push: { efficiency },
-      } 
-    )
+      }
+    );
 
     if (!answerpdfid) {
       return res.status(400).json({
@@ -1500,7 +1509,7 @@ const completedBookletHandler = async (req, res) => {
         taskId: currentTask._id,
         status: true,
       });
-      
+
       totalBooklets += currentTask.totalBooklets;
       console.log("total booklets", currentTask.totalBooklets);
 

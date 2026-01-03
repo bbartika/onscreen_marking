@@ -4,4 +4,4 @@ import { subjectFolderWatcher } from "../../controllers/studentControllers/subje
 
 
 
-export default router
+export default router;

@@ -9,6 +9,7 @@ import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchem
 const createCoordinateAllocation = async (req, res) => {
     try {
         const { courseSchemaRelationId, questionId, questionImages, answerImages } = req.body;
+        console.log(req.body);
 
         // Validate required fields
         if (!courseSchemaRelationId || !questionId || !questionImages || !answerImages) {

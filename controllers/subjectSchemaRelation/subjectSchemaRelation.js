@@ -326,8 +326,9 @@ const updateSubjectSchemaRelation = async (req, res) => {
             { $set: updatedFields },
             { new: true }
         );
+        const schemaName = await Schema.findById(schemaId).select('name');
 
-        res.status(200).json(updatedSubjectSchemaRelation);
+        res.status(200).json(schemaName,updatedSubjectSchemaRelation);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'An error occurred while updating the subject schema relation.' });

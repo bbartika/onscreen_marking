@@ -11,6 +11,7 @@ import AnswerPdf from "../../models/EvaluationModels/studentAnswerPdf.js";
 import Task from "../../models/taskModels/taskModel.js";
 import User from "../../models/authModels/User.js";
 import mongoose from "mongoose";
+import unzipper from "unzipper";
 // import AnswerPdfImage from "../../models/EvaluationModels/answerPdfImageModel.js";
 
 // const processingBookletsBySocket = async (req, res) => {
@@ -860,6 +861,69 @@ const getAllBookletsName = async (req, res) => {
   // Read PDF files from the scanned data folder
 };
 
+const uploadingBooklets = async (req,res) => {
+  try{
+    const { subjectCode } = req.body;
+
+    if (!subjectCode) {
+      return res.status(400).json({ message: "subjectCode is required" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "ZIP/RAR file is required" });
+    }
+
+    const subjectFolder = path.join(
+      process.cwd(),
+      "scannedFolder",
+      subjectCode
+    );
+
+    if (!fs.existsSync(subjectFolder)) {
+      return res.status(404).json({ message: `Subject folder ${subjectCode} not found` });
+    }
+
+    // 2️⃣ Extract ZIP directly into subject folder
+    await fs
+      .createReadStream(req.file.path)
+      .pipe(unzipper.Parse())
+      .on("entry", (entry) => {
+        const fileName = entry.path;
+        const ext = path.extname(fileName).toLowerCase();
+
+        if (ext === ".pdf") {
+          const destPath = path.join(
+            
+            subjectFolder,
+            path.basename(fileName)
+          );
+          entry.pipe(fs.createWriteStream(destPath));
+        } else {
+          entry.autodrain(); // skip non-pdf
+        }
+      })
+      .promise();
+
+    // 3️⃣ Remove uploaded ZIP
+    fs.unlinkSync(req.file.path);
+
+    return res.status(200).json({
+      message: "PDFs uploaded successfully",
+      subjectCode
+    });
+
+
+  }
+
+  catch (error) {
+    console.error("Upload ZIP error:", error);
+    return res.status(500).json({
+      message: "Failed to upload ZIP"
+    });
+  }
+  
+}
+
 // Check if any booklets (PDFs) are found
 const processingBookletsManually = async (req, res) => {
   const { subjectCode, bookletName } = req.body;
@@ -968,6 +1032,7 @@ const processingBookletsManually = async (req, res) => {
 
 export {
   processingBookletsBySocket,
+  uploadingBooklets,
   servingBooklets,
   removeRejectedBooklets,
   getAllBookletsName,

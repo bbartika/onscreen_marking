@@ -64,6 +64,8 @@ export const uploadMiddleware = (req, res, next) => {
   upload.fields([
     { name: "questionPdf", maxCount: 1 },
     { name: "answerPdf", maxCount: 1 },
+    
+  
   ])(req, res, (err) => {
     if (err) {
       console.error("Error uploading files:", err);
