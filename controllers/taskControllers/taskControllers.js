@@ -112,17 +112,11 @@ const assigningTask = async (req, res) => {
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
-    
-
     const todayPending = await AnswerPdf.countDocuments({
       taskId: { $in: taskIds },
       status: false,
       assignedDate: { $gte: startOfDay, $lte: endOfDay },
     }).session(session);
-
-    
-
-    
 
     // validate total assignment limit
     // if (previouslyAssigned + Number(bookletsToAssign) > user.maxBooklets) {
@@ -176,7 +170,7 @@ const assigningTask = async (req, res) => {
       taskId: task._id,
       answerPdfName: pdf,
       status: false,
-      assignedDate: new Date()
+      assignedDate: new Date(),
     }));
 
     await AnswerPdf.insertMany(answerPdfDocs, { session });
@@ -257,7 +251,12 @@ const autoAssigning = async (req, res) => {
     if (!subject) {
       console.error(`Subject ${subjectCode} not found.`);
       await session.abortTransaction();
-      return;
+      session.endSession();
+
+      return res.status(404).json({
+        success: false,
+        message: `Subject ${subjectCode} not found.`,
+      });
     }
 
     const users = await User.find({ subjectCode: subject._id });
@@ -265,7 +264,11 @@ const autoAssigning = async (req, res) => {
     if (users.length === 0) {
       console.warn(`No users found for subject ${subjectCode}.`);
       await session.abortTransaction();
-      return;
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: `No users available for subject ${subjectCode}.`,
+      });
     }
 
     const processedFolderPath = path.join(
@@ -277,7 +280,12 @@ const autoAssigning = async (req, res) => {
     if (!fs.existsSync(processedFolderPath)) {
       console.error(`Folder for subject ${subjectCode} not found.`);
       await session.abortTransaction();
-      return;
+      session.endSession();
+
+      return res.status(404).json({
+        success: false,
+        message: `Processed folder not found for subject ${subjectCode}.`,
+      });
     }
 
     // ALL PDFs in subject folder
@@ -288,7 +296,13 @@ const autoAssigning = async (req, res) => {
     if (allPdfs.length === 0) {
       console.log(`No PDFs found for subject ${subjectCode}.`);
       await session.abortTransaction();
-      return;
+      session.endSession();
+
+      return res.status(200).json({
+        success: true,
+        message: `No PDFs available for auto assignment.`,
+        assigned: 0,
+      });
     }
 
     let unallocatedPdfs = (
@@ -322,6 +336,12 @@ const autoAssigning = async (req, res) => {
     let assignmentIndex = 0;
     let totalAssigned = 0;
 
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
     // ⭐ MAIN ASSIGNMENT LOOP ⭐
     for (const pdfFile of newPdfs) {
       let assigned = false;
@@ -329,7 +349,6 @@ const autoAssigning = async (req, res) => {
       // Try to assign this PDF to someone
       for (let u = 0; u < numUsers; u++) {
         const user = users[assignmentIndex % numUsers];
-        const maxBooklets = user.maxBooklets || 0;
 
         // Count how many PDFs assigned to THIS user already
         // const userAssignedCount = await AnswerPdf.countDocuments({
@@ -341,30 +360,20 @@ const autoAssigning = async (req, res) => {
         //   },
         // }).session(session);
 
-        const userAssigned = await Task.aggregate([
-          {
-            $match: {
-              userId: user._id,
-              subjectCode,
-            },
-          },
-          {
-            $group: {
-              _id: null,
-              total: { $sum: "$totalBooklets" },
-            },
-          },
-        ]).session(session);
+        const taskIds = await Task.find({
+          userId: user._id,
+        })
+          .distinct("_id")
+          .session(session);
 
-        const userAssignedCount = userAssigned[0]?.total ?? 0;
+        const todayPending = await AnswerPdf.countDocuments({
+          taskId: { $in: taskIds },
+          status: false,
+          assignedDate: { $gte: startOfDay, $lte: endOfDay },
+        }).session(session);
 
-        console.log("userAssignedCount =", userAssignedCount);
-
-        // If user already reached maximum → skip
-        if (userAssignedCount >= maxBooklets) {
-          assignmentIndex++;
-          continue;
-        }
+        const dailyLimit = user.maxBooklets || 0;
+        const availableToday = Math.max(0, dailyLimit - todayPending);
 
         // FETCH existing task for this user
         let task = await Task.findOne({
@@ -383,6 +392,17 @@ const autoAssigning = async (req, res) => {
           });
 
           await task.save({ session });
+        } else {
+          // 🔁 Re-assignment case
+          if (task.status === "success") {
+            task.status = "inactive";
+            await task.save({ session });
+          }
+        }
+
+        if (availableToday <= 0) {
+          assignmentIndex++;
+          continue;
         }
 
         // SAVE this booklet under task
@@ -390,6 +410,7 @@ const autoAssigning = async (req, res) => {
           taskId: task._id,
           answerPdfName: pdfFile,
           status: false,
+          assignedDate: new Date(),
         }).save({ session });
 
         // Increase task booklet count

@@ -1,0 +1,70 @@
+{
+  "marks": [
+    {
+      "id": "1/5/2026, 2:48:15 PM",
+      "taskId": "695b43c76ae660fc0091dcde",
+      "page": "2",
+      "answerPdfId": "695b43c76ae660fc0091dce3",
+      "questionDefinitionId": "6954b57d324cb68550f818eb",
+      "question": 1,
+      "allottedMarks": 0,
+      "timeStamps": "1/5/2026, 2:48:15 PM",
+      "synced": false
+    },
+    {
+      "id": "1/5/2026, 3:04:19 PM",
+      "taskId": "695b43c76ae660fc0091dcde",
+      "page": "3",
+      "answerPdfId": "695b43c76ae660fc0091dce3",
+      "questionDefinitionId": "6954ee32324cb68550f8f5ca",
+      "question": 6,
+      "allottedMarks": 0,
+      "timeStamps": "1/5/2026, 3:04:19 PM",
+      "synced": false
+    },
+    {
+      "id": "1/5/2026, 3:06:06 PM",
+      "taskId": "695b43c76ae660fc0091dcde",
+      "page": "3",
+      "answerPdfId": "695b43c76ae660fc0091dce3",
+      "questionDefinitionId": "695238a8d49018a62d88b5e5",
+      "question": 3,
+      "allottedMarks": 0,
+      "timeStamps": "1/5/2026, 3:06:06 PM",
+      "synced": false
+    },
+    {
+      "id": "1/5/2026, 3:08:26 PM",
+      "taskId": "695b43c76ae660fc0091dcde",
+      "page": "3",
+      "answerPdfId": "695b43c76ae660fc0091dce3",
+      "questionDefinitionId": "6954ee58324cb68550f8f681",
+      "question": 4,
+      "allottedMarks": 0,
+      "timeStamps": "1/5/2026, 3:08:26 PM",
+      "synced": false
+    },
+    {
+      "id": "1/5/2026, 3:07:20 PM",
+      "taskId": "695b43c76ae660fc0091dcde",
+      "page": "3",
+      "answerPdfId": "695b43c76ae660fc0091dce3",
+      "questionDefinitionId": "695238bbd49018a62d88b5f9",
+      "question": 5,
+      "allottedMarks": 0,
+      "timeStamps": "1/5/2026, 3:07:20 PM",
+      "synced": false
+    },
+    {
+      "id": "1/5/2026, 3:07:24 PM",
+      "taskId": "695b43c76ae660fc0091dcde",
+      "page": "3",
+      "answerPdfId": "695b43c76ae660fc0091dce3",
+      "questionDefinitionId": "6954ee32324cb68550f8f5ca",
+      "question": 2,
+      "allottedMarks": 0,
+      "timeStamps": "1/5/2026, 3:07:24 PM",
+      "synced": false
+    }
+  ]
+}

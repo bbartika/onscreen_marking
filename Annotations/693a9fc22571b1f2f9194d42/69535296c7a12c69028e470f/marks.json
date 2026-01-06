@@ -43,6 +43,17 @@
       "allottedMarks": 4,
       "timeStamps": "1/3/2026, 2:21:31 PM",
       "synced": false
+    },
+    {
+      "id": "1/5/2026, 4:40:01 PM",
+      "taskId": "69535296c7a12c69028e470c",
+      "page": "2",
+      "answerPdfId": "69535296c7a12c69028e470f",
+      "questionDefinitionId": "6954ee31324cb68550f8f5c3",
+      "question": 2,
+      "allottedMarks": 0,
+      "timeStamps": "1/5/2026, 4:40:01 PM",
+      "synced": false
     }
   ]
 }
