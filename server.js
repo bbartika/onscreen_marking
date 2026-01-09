@@ -89,6 +89,19 @@ app.use('/api/bookletprocessing', bookletProcessingRoutes);
 app.use('/api/resultgeneration', resultGenerationRoutes);
 app.use('/api/analytic', analyticRoutes);
 
+app.use((err, req, res, next) => {
+  if (
+    err.code === "LIMIT_UNEXPECTED_FILE" ||
+    err.message.includes("Only ZIP folder or single PDF")
+  ) {
+    return res.status(400).json({
+      message: "Only ZIP folder or single PDF file will be accepted"
+    });
+  }
+  return res.status(500).json({
+    message: err.message || "Internal Server Error"
+  });
+});
 
 // Socket.IO Connection event
 io.on('connection', (socket) => {

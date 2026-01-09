@@ -839,8 +839,19 @@ const uploadingBooklets = async (req, res) => {
       return res.status(400).json({ message: "subjectCode is required" });
     }
 
+    /* =====================================================
+       🚫 NORMAL FOLDER UPLOAD (MULTIPLE FILES)
+    ===================================================== */
+    if (req.files && req.files.length > 1) {
+      return res.status(400).json({
+        message: "Folder upload detected. Please upload the folder in ZIP format."
+      });
+    }
+
     if (!req.file) {
-      return res.status(400).json({ message: "ZIP/RAR file is required" });
+      return res.status(400).json({
+        message: "Please upload a PDF or a ZIP file"
+      });
     }
 
     const subjectFolder = path.join(
@@ -850,40 +861,80 @@ const uploadingBooklets = async (req, res) => {
     );
 
     if (!fs.existsSync(subjectFolder)) {
-      return res
-        .status(404)
-        .json({ message: `Subject folder ${subjectCode} not found` });
+      return res.status(404).json({
+        message: `Subject folder ${subjectCode} not found`
+      });
     }
-    //there is a condition to check if one single pdf is uploaded
-    if (req.file.path)
-      // 2️⃣ Extract ZIP directly into subject folder
+
+    const fileExt = path.extname(req.file.originalname).toLowerCase();
+
+    /* =====================================================
+       ✅ SINGLE PDF UPLOAD
+    ===================================================== */
+    if (fileExt === ".pdf") {
+      fs.renameSync(
+        req.file.path,
+        path.join(subjectFolder, req.file.originalname)
+      );
+
+      return res.status(200).json({
+        message: "Single PDF uploaded successfully",
+        subjectCode
+      });
+    }
+
+    /* =====================================================
+       ✅ ZIP FILE UPLOAD
+    ===================================================== */
+    if (fileExt === ".zip") {
+      let pdfFound = false;
+
       await fs
         .createReadStream(req.file.path)
         .pipe(unzipper.Parse())
         .on("entry", (entry) => {
-          const fileName = entry.path;
-          const ext = path.extname(fileName).toLowerCase();
+          const ext = path.extname(entry.path).toLowerCase();
 
           if (ext === ".pdf") {
-            const destPath = path.join(subjectFolder, path.basename(fileName));
-            entry.pipe(fs.createWriteStream(destPath));
+            pdfFound = true;
+            entry.pipe(
+              fs.createWriteStream(
+                path.join(subjectFolder, path.basename(entry.path))
+              )
+            );
           } else {
-            entry.autodrain(); // skip non-pdf
+            entry.autodrain();
           }
         })
         .promise();
 
-    // 3️⃣ Remove uploaded ZIP
+      fs.unlinkSync(req.file.path);
+
+      if (!pdfFound) {
+        return res.status(400).json({
+          message: "ZIP file does not contain any PDF files"
+        });
+      }
+
+      return res.status(200).json({
+        message: "ZIP extracted and PDFs uploaded successfully",
+        subjectCode
+      });
+    }
+
+    /* =====================================================
+       🚫 INVALID FILE TYPE
+    ===================================================== */
     fs.unlinkSync(req.file.path);
 
-    return res.status(200).json({
-      message: "PDFs uploaded successfully",
-      subjectCode,
+    return res.status(400).json({
+      message: "Only PDF or ZIP files are allowed"
     });
+
   } catch (error) {
-    console.error("Upload ZIP error:", error);
+    console.error("Upload error:", error);
     return res.status(500).json({
-      message: "Failed to upload ZIP",
+      message: "Failed to upload files"
     });
   }
 };

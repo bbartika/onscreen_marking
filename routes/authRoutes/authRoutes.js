@@ -12,6 +12,9 @@ import {
     getAllUsers,
     updateUserDetails,
     createUsersByCsvFile,
+    otpSend,
+    otpVerify,
+    passwordReset
 } from "../../controllers/authControllers/authControllers.js";
 
 
@@ -19,6 +22,9 @@ router.post('/signup', authMiddleware, createUser);
 router.post('/signin', userLogin);
 router.post('/verify', verifyOtp);
 router.post('/createuserbycsv', authMiddleware, createUsersByCsvFile);
+router.post('/send-otp',  otpSend);
+router.post('/verify-otp', otpVerify);
+router.post('/reset-password', passwordReset);
 router.put('/forgotpassword', forgotPassword);
 router.put('/update/:id', authMiddleware, updateUserDetails);
 router.delete('/removeUser/:id', authMiddleware, removeUser);

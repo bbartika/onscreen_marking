@@ -116,7 +116,7 @@ const updateSchema = async (req, res) => {
     maxMarks,
     minMarks,
     minTime,
-    maxTime,
+    maxTime, 
     compulsoryQuestions,
     status,
     isActive,

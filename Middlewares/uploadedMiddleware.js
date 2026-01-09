@@ -18,9 +18,15 @@ const storage = multer.diskStorage({
 const uploadedMiddleware = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    if (!file.originalname.match(/\.zip$/i)) {
-      return cb(new Error("Only ZIP files are allowed"));
+    const ext = path.extname(file.originalname).toLowerCase();
+
+    if (ext !== ".zip" && ext !== ".pdf") {
+      return cb(
+        new Error("Only PDF or ZIP files are allowed"),
+        false
+      );
     }
+
     cb(null, true);
   }
 });

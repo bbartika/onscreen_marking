@@ -46,10 +46,10 @@ const subjectFolderSchema = new mongoose.Schema({
     unique: true
   },
 
-  description: {
-    type: String,
-    default: ""   // ✅ NOT required
-  },
+  // description: {
+  //   type: String,
+  //   default: ""   // ✅ NOT required
+  // },
 
   allocated: {
     type: Number,

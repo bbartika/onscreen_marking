@@ -70,11 +70,11 @@
       "numberOfSubQuestions": 2,
       "compulsorySubQuestions": 1,
       "__v": 0,
-      "allottedMarks": 0,
+      "allottedMarks": 7.5,
       "answerPdfId": "6958aafdec5cd1c1f7d568fc",
       "timerStamps": "",
       "isMarked": true,
-      "updatedAt": "2026-01-05T11:11:54.656Z"
+      "updatedAt": "2026-01-08T09:51:57.494Z"
     },
     {
       "_id": "6954ee31324cb68550f8f5c3",
@@ -191,5 +191,5 @@
       "updatedAt": "2026-01-03T09:20:57.873Z"
     }
   ],
-  "lastSaved": "2026-01-05T11:11:54.656Z"
+  "lastSaved": "2026-01-08T09:51:57.496Z"
 }

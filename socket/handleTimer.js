@@ -74,7 +74,7 @@ export default function handleTimerSocket(io) {
             taskId,
             answerPdfId,
             totalTime: maxTime,
-            remainingTime: maxTime,
+            remainingTime: 0,
 
             startTime: Date.now(),
             lastUpdated: Date.now(),
@@ -110,6 +110,8 @@ export default function handleTimerSocket(io) {
           taskId,
           answerPdfId,
           remainingTime: timer.remainingTime,
+          minTime: minTime,
+          maxTime: maxTime,
           
           totalTime: timer.totalTime,
         });

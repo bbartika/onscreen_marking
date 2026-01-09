@@ -11,6 +11,233 @@ import extractImagesFromPdf from "../../services/extractImagesFromPdf.js";
 /*                              CREATE SUBJECT SCHEMA RELATION                */
 /* -------------------------------------------------------------------------- */
 
+// const createSubjectSchemaRelation = async (req, res) => {
+//   const { schemaId, subjectId, relationName } = req.body;
+
+//   console.log("Request Body:", req.body);
+
+//   try {
+//     // Validate incoming data
+//     if (
+//       !schemaId ||
+//       !subjectId ||
+//       !req.files?.questionPdf ||
+//       !req.files?.answerPdf
+//     ) {
+//       return res.status(400).json({ message: "All fields are required." });
+//     }
+
+//     // Validate ObjectId
+//     if (!isValidObjectId(subjectId) || !isValidObjectId(schemaId)) {
+//       return res
+//         .status(400)
+//         .json({ message: "Invalid subjectId or schemaId." });
+//     }
+
+//     // Ensure relationName is provided
+//     if (!relationName) {
+//       return res.status(400).json({ message: "Relation name is required." });
+//     }
+
+//     // Check if the Subject exists
+//     const isValidSubject = await Subject.findOne({ _id: subjectId });
+
+//     if (!isValidSubject) {
+//       return res.status(404).json({ message: "Subject not found." });
+//     }
+
+//     // Check if the Schema exists
+//     const isValidSchema = await Schema.findOne({ _id: schemaId });
+//     if (!isValidSchema) {
+//       return res.status(404).json({ message: "Schema not found." });
+//     }
+
+//     // Remove any existing SubjectSchemaRelation with the same schemaId and subjectId
+//     const existingRelation = await SubjectSchemaRelation.findOne({
+//       schemaId,
+//       subjectId,
+//     });
+
+//     console.log("Existing Relation:", existingRelation);
+
+//     if (existingRelation) {
+//       // Delete associated files
+//       const questionPdfPath = path.resolve(
+//         process.cwd(),
+//         "uploadedPdfs/questionPdfs",
+//         `${existingRelation.questionPdfPath}.pdf`
+//       );
+//       const answerPdfPath = path.resolve(
+//         process.cwd(),
+//         "uploadedPdfs/answerPdfs",
+//         `${existingRelation.answerPdfPath}.pdf`
+//       );
+//       const questionImageDir = path.resolve(
+//         process.cwd(),
+//         "uploadedPdfs/extractedQuestionPdfImages",
+//         existingRelation.questionPdfPath
+//       );
+//       const answerImageDir = path.resolve(
+//         process.cwd(),
+//         "uploadedPdfs/extractedAnswerPdfImages",
+//         existingRelation.answerPdfPath
+//       );
+
+//       // Delete files and directories
+//       [questionPdfPath, answerPdfPath].forEach((filePath) => {
+//         if (fs.existsSync(filePath)) {
+//           fs.unlinkSync(filePath); // Remove PDF files
+//         }
+//       });
+
+//       [questionImageDir, answerImageDir].forEach((dirPath) => {
+//         if (fs.existsSync(dirPath)) {
+//           fs.rmSync(dirPath, { recursive: true, force: true }); // Remove image directories
+//         }
+//       });
+
+//       // Remove the existing database entry
+//       await SubjectSchemaRelation.deleteOne({ _id: existingRelation._id });
+//     }
+
+//     // Define base directories for storing files
+//     const baseDir = path.resolve(process.cwd(), "uploadedPdfs");
+//     const questionPdfDir = path.join(baseDir, "questionPdfs");
+//     const answerPdfDir = path.join(baseDir, "answerPdfs");
+//     const extractedQuestionImageDir = path.join(
+//       baseDir,
+//       "extractedQuestionPdfImages"
+//     );
+//     const extractedAnswerImageDir = path.join(
+//       baseDir,
+//       "extractedAnswerPdfImages"
+//     );
+
+//     // Ensure the directories exist
+//     const ensureDir = (dir) => {
+//       if (!fs.existsSync(dir)) {
+//         fs.mkdirSync(dir, { recursive: true });
+//       }
+//     };
+
+//     [
+//       questionPdfDir,
+//       answerPdfDir,
+//       extractedQuestionImageDir,
+//       extractedAnswerImageDir,
+//     ].forEach(ensureDir);
+
+//     // Move and rename the PDF files
+//     const questionPdf = req.files.questionPdf[0];
+//     const answerPdf = req.files.answerPdf[0];
+
+//     if (!fs.existsSync(questionPdf.path)) {
+//       throw new Error(`Question PDF missing at ${questionPdf.path}`);
+//     }
+
+//     if (!fs.existsSync(answerPdf.path)) {
+//       throw new Error(`Answer PDF missing at ${answerPdf.path}`);
+//     }
+//     console.log("questionpdfDir", questionPdfDir);
+//     console.log("answerPdfDir", answerPdfDir);
+
+//     const questionPdfPath = path.join(questionPdfDir, questionPdf.filename);
+//     const answerPdfPath = path.join(answerPdfDir, answerPdf.filename);
+
+//     console.log("Q temp:", questionPdf.path);
+//     console.log("A temp:", answerPdf.path);
+
+//     try {
+//       await fs.promises.rename(questionPdf.path, questionPdfPath);
+//       await fs.promises.rename(answerPdf.path, answerPdfPath);
+//     } catch (error) {
+//       console.error("Error moving files:", error);
+//       return res.status(500).json({ error: "Error processing files" });
+//     }
+
+//     // Extract images from PDFs and create directories for extracted images
+//     const questionImageSubDir = path.join(
+//       extractedQuestionImageDir,
+//       `${path.basename(questionPdf.filename, ".pdf")}`
+//     );
+//     const answerImageSubDir = path.join(
+//       extractedAnswerImageDir,
+//       `${path.basename(answerPdf.filename, ".pdf")}`
+//     );
+
+//     ensureDir(questionImageSubDir);
+//     ensureDir(answerImageSubDir);
+
+//     // Create the new SubjectSchemaRelation document
+//     // const newSubjectSchemaRelation = new SubjectSchemaRelation({
+//     //     schemaId,
+//     //     subjectId,
+//     //     questionPdfPath: `${path.basename(questionPdf.filename, '.pdf')}`,
+//     //     answerPdfPath: `${path.basename(answerPdf.filename, '.pdf')}`,
+//     //     countOfQuestionImages: questionImageCount,
+//     //     countOfAnswerImages: answerImageCount,
+//     //     relationName,
+//     //     coordinateStatus: false
+//     // });
+
+//     const newSubjectSchemaRelation = new SubjectSchemaRelation({
+//       schemaId,
+//       subjectId,
+//       questionPdfPath: path.basename(questionPdf.filename, ".pdf"),
+//       answerPdfPath: path.basename(answerPdf.filename, ".pdf"),
+//       countOfQuestionImages: 0,
+//       countOfAnswerImages: 0,
+//       relationName,
+//       coordinateStatus: false,
+//       processingStatus: "processing",
+//     });
+
+//     const savedSubjectSchemaRelation = await newSubjectSchemaRelation.save();
+
+//     // Respond with the saved SubjectSchemaRelation
+//     res.status(201).json({
+//       message: "PDF uploaded successfully. Image extraction started.",
+//       relationId: savedSubjectSchemaRelation._id,
+//     });
+
+//     setImmediate(async () => {
+//       try {
+//         const questionImages = await extractImagesFromPdf(
+//           questionPdfPath,
+//           questionImageSubDir
+//         );
+
+//         const answerImages = await extractImagesFromPdf(
+//           answerPdfPath,
+//           answerImageSubDir
+//         );
+
+//         await SubjectSchemaRelation.findByIdAndUpdate(
+//           savedSubjectSchemaRelation._id,
+//           {
+//             countOfQuestionImages: questionImages.length,
+//             countOfAnswerImages: answerImages.length,
+//             processingStatus: "completed",
+//           }
+//         );
+//       } catch (err) {
+//         await SubjectSchemaRelation.findByIdAndUpdate(
+//           savedSubjectSchemaRelation._id,
+//           {
+//             processingStatus: "failed",
+//             errorMessage: err.message,
+//           }
+//         );
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Error creating subject schema relation:", error);
+//     res.status(500).json({
+//       error: "An error occurred while creating the subject schema relation.",
+//     });
+//   }
+// };
+
 const createSubjectSchemaRelation = async (req, res) => {
   const { schemaId, subjectId, relationName } = req.body;
 
@@ -52,52 +279,57 @@ const createSubjectSchemaRelation = async (req, res) => {
       return res.status(404).json({ message: "Schema not found." });
     }
 
-    // Remove any existing SubjectSchemaRelation with the same schemaId and subjectId
-    const existingRelation = await SubjectSchemaRelation.findOne({
-      schemaId,
-      subjectId,
-    });
+    // Check for existing relation with same subjectId (any schema)
+    const existingRelations = await SubjectSchemaRelation.find({ subjectId });
 
-    console.log("Existing Relation:", existingRelation);
+    console.log("Existing Relations:", existingRelations);
 
-    if (existingRelation) {
+    if (existingRelations.length > 0) {
+      // Collect all relation IDs
+      const relationIds = existingRelations.map(relation => relation._id);
+      
+      // Delete from coordinateallocations using courseSchemaRelationId
+      await CoordinateAllocation.deleteMany({ courseSchemaRelationId: { $in: relationIds } });
+      
+      // Delete from courseschemarelations (SubjectSchemaRelation)
+      await SubjectSchemaRelation.deleteMany({ subjectId });
+      
       // Delete associated files
-      const questionPdfPath = path.resolve(
-        process.cwd(),
-        "uploadedPdfs/questionPdfs",
-        `${existingRelation.questionPdfPath}.pdf`
-      );
-      const answerPdfPath = path.resolve(
-        process.cwd(),
-        "uploadedPdfs/answerPdfs",
-        `${existingRelation.answerPdfPath}.pdf`
-      );
-      const questionImageDir = path.resolve(
-        process.cwd(),
-        "uploadedPdfs/extractedQuestionPdfImages",
-        existingRelation.questionPdfPath
-      );
-      const answerImageDir = path.resolve(
-        process.cwd(),
-        "uploadedPdfs/extractedAnswerPdfImages",
-        existingRelation.answerPdfPath
-      );
+      existingRelations.forEach(relation => {
+        const questionPdfPath = path.resolve(
+          process.cwd(),
+          "uploadedPdfs/questionPdfs",
+          `${relation.questionPdfPath}.pdf`
+        );
+        const answerPdfPath = path.resolve(
+          process.cwd(),
+          "uploadedPdfs/answerPdfs",
+          `${relation.answerPdfPath}.pdf`
+        );
+        const questionImageDir = path.resolve(
+          process.cwd(),
+          "uploadedPdfs/extractedQuestionPdfImages",
+          relation.questionPdfPath
+        );
+        const answerImageDir = path.resolve(
+          process.cwd(),
+          "uploadedPdfs/extractedAnswerPdfImages",
+          relation.answerPdfPath
+        );
 
-      // Delete files and directories
-      [questionPdfPath, answerPdfPath].forEach((filePath) => {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath); // Remove PDF files
-        }
+        // Delete files and directories
+        [questionPdfPath, answerPdfPath].forEach((filePath) => {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        });
+
+        [questionImageDir, answerImageDir].forEach((dirPath) => {
+          if (fs.existsSync(dirPath)) {
+            fs.rmSync(dirPath, { recursive: true, force: true });
+          }
+        });
       });
-
-      [questionImageDir, answerImageDir].forEach((dirPath) => {
-        if (fs.existsSync(dirPath)) {
-          fs.rmSync(dirPath, { recursive: true, force: true }); // Remove image directories
-        }
-      });
-
-      // Remove the existing database entry
-      await SubjectSchemaRelation.deleteOne({ _id: existingRelation._id });
     }
 
     // Define base directories for storing files
@@ -238,6 +470,7 @@ const createSubjectSchemaRelation = async (req, res) => {
   }
 };
 
+
 /* -------------------------------------------------------------------------- */
 /*                           GET SUBJECT SCHEMA RELATION                      */
 /* -------------------------------------------------------------------------- */
@@ -333,6 +566,10 @@ const deleteSubjectSchemaRelationById = async (req, res) => {
     removeFileOrDirectory(answerPdfPath);
     removeFileOrDirectory(extractedQuestionImageDir);
     removeFileOrDirectory(extractedAnswerImageDir);
+
+
+    // Delete related CoordinateAllocation records first
+    await CoordinateAllocation.deleteMany({ courseSchemaRelationId: id });
 
     // Delete the SubjectSchemaRelation from the database
     await SubjectSchemaRelation.findByIdAndDelete(id);

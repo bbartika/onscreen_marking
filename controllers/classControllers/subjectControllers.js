@@ -3,6 +3,7 @@ import Task from "../../models/taskModels/taskModel.js";
 import SubjectFolderModel from "../../models/StudentModels/subjectFolderModel.js";
 import { isValidObjectId } from "../../services/mongoIdValidation.js";
 import CourseSchemaRelation from "../../models/subjectSchemaRelationModel/subjectSchemaRelationModel.js";
+import CoordinateAllocation from "../../models/subjectSchemaRelationModel/coordinateAllocationModel.js";
 import Schema from "../../models/schemeModel/schema.js";
 import fs from "fs";
 import path from "path";
@@ -77,11 +78,104 @@ const removeSubject = async (req, res) => {
       return res.status(400).json({ message: "Invalid subject ID." });
     }
 
-    const subject = await Subject.findByIdAndDelete(id);
+    const subject = await Subject.findById(id).select("code").lean();
+
     if (!subject) {
       return res.status(404).json({ message: "Subject not found." });
     }
-    return res.status(200).json({ message: "Subject successfully removed." });
+
+    const subjectCode = subject.code;
+
+    // find this subject code is existing inside scanned folder
+    const scannedFolderPath = path.join(
+      process.cwd(),
+      "scannedFolder",
+      subjectCode
+    );
+    if (fs.existsSync(scannedFolderPath) && fs.readdirSync(scannedFolderPath).length > 0) {
+      return res
+        .status(400)
+        .json({
+          message: `Subject code '${subjectCode}' folder exists in scannedFolder. deletion can not be possible`,
+        });
+    }
+
+    // find this subject code is existing inside processed folder
+
+    const processedFolderPath = path.join(
+      process.cwd(),
+      "processedFolder",
+      subjectCode
+    );
+    if (fs.existsSync(processedFolderPath) && fs.readdirSync(processedFolderPath).length > 0) {
+      return res
+        .status(400)
+        .json({
+          message: `Subject code '${subjectCode}' folder exists in processedFolder. deletion can not be possible`,
+        });
+    }
+
+    //find there is alraedy created task under this subject
+    const existingTask = await Task.find({ subjectCode: subjectCode });
+    if (existingTask.length > 0) {
+      return res
+        .status(400)
+        .json({
+          message: `Tasks are already assigned to subject code '${subjectCode.code}'. Deletion not possible.`,
+        });
+    }
+
+    //this will check
+
+    // Find all SubjectSchemaRelations for this subject (try both ObjectId and string)
+    let subjectSchemaRelations = await CourseSchemaRelation.find({ subjectId: id });
+    if (subjectSchemaRelations.length === 0) {
+      // Try as string if ObjectId didn't work
+      subjectSchemaRelations = await CourseSchemaRelation.find({ subjectId: id.toString() });
+    }
+    
+    if (subjectSchemaRelations.length > 0) {
+      // Get all relation IDs
+      const relationIds = subjectSchemaRelations.map(relation => relation._id);
+      
+      // Delete CoordinateAllocation records
+      await CoordinateAllocation.deleteMany({ courseSchemaRelationId: { $in: relationIds } });
+      
+      // Delete associated files
+      subjectSchemaRelations.forEach(relation => {
+        const baseDir = path.resolve(process.cwd(), "uploadedPdfs");
+        const questionPdfPath = path.join(baseDir, "questionPdfs", `${relation.questionPdfPath}.pdf`);
+        const answerPdfPath = path.join(baseDir, "answerPdfs", `${relation.answerPdfPath}.pdf`);
+        const questionImageDir = path.join(baseDir, "extractedQuestionPdfImages", relation.questionPdfPath);
+        const answerImageDir = path.join(baseDir, "extractedAnswerPdfImages", relation.answerPdfPath);
+
+        [questionPdfPath, answerPdfPath].forEach((filePath) => {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        });
+
+        [questionImageDir, answerImageDir].forEach((dirPath) => {
+          if (fs.existsSync(dirPath)) {
+            fs.rmSync(dirPath, { recursive: true, force: true });
+          }
+        });
+      });
+      
+      // Delete SubjectSchemaRelation records
+      await CourseSchemaRelation.deleteMany({ subjectId: id });
+    }
+
+    // Try to delete the subject (if exists)
+    const deletedSubject = await Subject.findByIdAndDelete(id);
+    
+    if (!deletedSubject && subjectSchemaRelations.length === 0) {
+      return res.status(404).json({ message: "Subject not found." });
+    }
+    
+    return res.status(200).json({ message: "Subject and all related data successfully removed." });
+
+    
   } catch (error) {
     console.error(error);
     return res
@@ -90,6 +184,67 @@ const removeSubject = async (req, res) => {
   }
 };
 
+// const removeSubject = async (req, res) => {
+//   const { id } = req.params;
+//   try {
+//     if (!isValidObjectId(id)) {
+//       return res.status(400).json({ message: "Invalid subject ID." });
+//     }
+
+//     // Find all SubjectSchemaRelations for this subject (try both ObjectId and string)
+//     let subjectSchemaRelations = await CourseSchemaRelation.find({ subjectId: id });
+//     if (subjectSchemaRelations.length === 0) {
+//       // Try as string if ObjectId didn't work
+//       subjectSchemaRelations = await CourseSchemaRelation.find({ subjectId: id.toString() });
+//     }
+    
+//     if (subjectSchemaRelations.length > 0) {
+//       // Get all relation IDs
+//       const relationIds = subjectSchemaRelations.map(relation => relation._id);
+      
+//       // Delete CoordinateAllocation records
+//       await CoordinateAllocation.deleteMany({ courseSchemaRelationId: { $in: relationIds } });
+      
+//       // Delete associated files
+//       subjectSchemaRelations.forEach(relation => {
+//         const baseDir = path.resolve(process.cwd(), "uploadedPdfs");
+//         const questionPdfPath = path.join(baseDir, "questionPdfs", `${relation.questionPdfPath}.pdf`);
+//         const answerPdfPath = path.join(baseDir, "answerPdfs", `${relation.answerPdfPath}.pdf`);
+//         const questionImageDir = path.join(baseDir, "extractedQuestionPdfImages", relation.questionPdfPath);
+//         const answerImageDir = path.join(baseDir, "extractedAnswerPdfImages", relation.answerPdfPath);
+
+//         [questionPdfPath, answerPdfPath].forEach((filePath) => {
+//           if (fs.existsSync(filePath)) {
+//             fs.unlinkSync(filePath);
+//           }
+//         });
+
+//         [questionImageDir, answerImageDir].forEach((dirPath) => {
+//           if (fs.existsSync(dirPath)) {
+//             fs.rmSync(dirPath, { recursive: true, force: true });
+//           }
+//         });
+//       });
+      
+//       // Delete SubjectSchemaRelation records
+//       await CourseSchemaRelation.deleteMany({ subjectId: id });
+//     }
+
+//     // Try to delete the subject (if exists)
+//     const deletedSubject = await Subject.findByIdAndDelete(id);
+    
+//     if (!deletedSubject && subjectSchemaRelations.length === 0) {
+//       return res.status(404).json({ message: "Subject not found." });
+//     }
+    
+//     return res.status(200).json({ message: "Subject and all related data successfully removed." });
+//   } catch (error) {
+//     console.error(error);
+//     return res
+//       .status(500)
+//       .json({ message: "An error occurred while removing the subject." });
+//   }
+// };
 /* -------------------------------------------------------------------------- */
 /*                           GET SUBJECT BY ID                                */
 /* -------------------------------------------------------------------------- */
@@ -229,14 +384,14 @@ const getAllSubjectBasedOnClassId = async (req, res) => {
     const result = await Promise.all(
       subjects.map(async (subject) => {
         const schemaRelation = await CourseSchemaRelation.findOne({
-          subjectId: subject._id
+          subjectId: subject._id,
         }).lean();
 
         if (!schemaRelation) {
           return {
             ...subject,
-            
-            flag: false
+
+            flag: false,
           };
         }
 
@@ -248,10 +403,10 @@ const getAllSubjectBasedOnClassId = async (req, res) => {
           ...subject,
           flag: true,
           schemaId: schemaRelation.schemaId,
-          schemaName: schema?.name || null
+          schemaName: schema?.name || null,
         };
       })
-    ); 
+    );
 
     return res.status(200).json(result);
   } catch (error) {

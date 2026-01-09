@@ -232,7 +232,7 @@ export default function handleAnnotationSocket(io) {
           page: data.page,
           answerPdfImageId: data.answerPdfImageId,
           answerPdfId: data.answerPdfId,
-          userId : data.userId,
+          userId: data.userId,
           questionDefinitionId: data.questionDefinitionId,
           iconUrl: data.iconUrl,
           question: data.question,
@@ -359,7 +359,7 @@ export default function handleAnnotationSocket(io) {
     //✅ Delete annotation
     socket.on("delete-annotation", async (data) => {
       try {
-        console.log("data for delete annotation",data);
+        console.log("data for delete annotation", data);
 
         const {
           taskId,
@@ -631,6 +631,7 @@ export default function handleAnnotationSocket(io) {
           answerPdfId: data.answerPdfId,
           questionDefinitionId: data.questionDefinitionId,
           question: data.question,
+          parentQuestionId: data.parentQuestionId,
           allottedMarks: data.allottedMarks || 0,
           timeStamps: data.timeStamps || new Date().toLocaleString(),
           synced: data.synced !== undefined ? data.synced : false,
@@ -668,6 +669,20 @@ export default function handleAnnotationSocket(io) {
             "❌ Mark not found in marksData.json with ID:",
             marksObject.id
           );
+        }
+
+        if (marksObject.parentQuestionId) {
+          const parentIndex = marksData.marks.findIndex(
+            (m) => m._id === marksObject.parentQuestionId
+          );
+
+          if (parentIndex !== -1) {
+            marksData.marks[parentIndex].allottedMarks +=
+              marksObject.allottedMarks;
+
+            marksData.marks[parentIndex].isMarked = true;
+            marksData.marks[parentIndex].updatedAt = new Date().toISOString();
+          }
         }
 
         saveMarks(userId, answerPdfId, marksData);
@@ -728,9 +743,23 @@ export default function handleAnnotationSocket(io) {
           );
         }
 
+        if (marksObject.parentQuestionId) {
+          const parentIndex = questionMarksData.marks.findIndex(
+            (m) => m._id === marksObject.parentQuestionId
+          );
+
+          if (parentIndex !== -1) {
+            questionMarksData.marks[parentIndex].allottedMarks +=
+              marksObject.allottedMarks;
+
+            questionMarksData.marks[parentIndex].isMarked = true;
+            questionMarksData.marks[parentIndex].updatedAt = new Date().toISOString();
+          }
+        }
+
         const roomName = `task_${taskId}`;
         io.to(roomName).emit("marks-updated", {
-          ...marksData,
+          ...questionMarksData,
           status: "completed",
         });
 
