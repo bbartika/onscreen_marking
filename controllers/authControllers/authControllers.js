@@ -38,12 +38,10 @@ const createUser = async (req, res) => {
 
   if (role === "evaluator") {
     if (!subjectCode || !maxBooklets) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Subject code and max booklets are required for evaluator role",
-        });
+      return res.status(400).json({
+        message:
+          "Subject code and max booklets are required for evaluator role",
+      });
     }
   }
 
@@ -51,6 +49,13 @@ const createUser = async (req, res) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
   // const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+  if (password) {
+    await sendEmail(
+      email,
+      `The password you created for the Onscreen Marking site is "${password}". Please keep it confidential.`
+    );
+  }
 
   try {
     session.startTransaction();
@@ -76,6 +81,7 @@ const createUser = async (req, res) => {
     // });
 
     await session.commitTransaction();
+
     res.status(201).json({ message: "User created successfully" });
   } catch (error) {
     await session.abortTransaction();
@@ -92,172 +98,259 @@ const createUser = async (req, res) => {
 /*                           USER LOGIN                                       */
 /* -------------------------------------------------------------------------- */
 
+// const userLogin = async (req, res) => {
+//   const { email, password, type } = req.body;
+
+//   if (!email) {
+//     return res.status(400).json({ message: "Email is required" });
+//   }
+
+//   if (!password) {
+//     return res.status(400).json({ message: "Password is required" });
+//   }
+
+//   try {
+//     if (password && type === "password") {
+//       const user = await User.findOne({ email });
+
+//       if (!user) {
+//         return res
+//           .status(401)
+//           .json({ message: "User not found. Please sign up first." });
+//       }
+
+//       const isPasswordValid = await bcrypt.compare(password, user.password);
+
+//       if (!isPasswordValid) {
+//         return res.status(401).json({ message: "Invalid email or password" });
+//       }
+
+
+
+//       const token = jwt.sign(
+//         { userId: user._id, email: user.email, role: user.role },
+//         process.env.JWT_SECRET,
+//         { expiresIn: "72h" }
+//       );
+
+//       res
+//         .status(200)
+//         .json({ message: "Login successful", token: token, userId: user._id });
+//     } else if (type === "otp") {
+//       const user = await User.findOne({ email });
+
+//       if (!user) {
+//         return res
+//           .status(404)
+//           .json({ message: "User not found. Please sign up first." });
+//       }
+
+//       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+//       await sendOtpEmail(email, otpCode);
+
+//       await Otp.create({
+//         user: user._id,
+//         otp: otpCode,
+//         expiresAt: Date.now() + 10 * 60 * 1000,
+//         otpAttempts: 0,
+//       });
+
+//       res
+//         .status(200)
+//         .json({ message: "OTP sent to your email.", userId: user._id });
+//     }
+//   } catch (error) {
+//     console.error("Error during login:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Internal server error", error: error.message });
+//   }
+// };
+
 const userLogin = async (req, res) => {
-  const { email, password, type } = req.body;
+  
+    const { email, password, type } = req.body;
 
-  if (!email) {
-    return res.status(400).json({ message: "Email is required" });
-  }
-
-  if (!password) {
-    return res.status(400).json({ message: "Password is required" });
-  }
-
-  try {
-    if (password && type === "password") {
-      const user = await User.findOne({ email });
-
-      if (!user) {
-        return res
-          .status(401)
-          .json({ message: "User not found. Please sign up first." });
-      }
-
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-
-      if (!isPasswordValid) {
-        return res.status(401).json({ message: "Invalid email or password" });
-      }
-
-      const token = jwt.sign(
-        { userId: user._id, email: user.email, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: "72h" }
-      );
-
-      res
-        .status(200)
-        .json({ message: "Login successful", token: token, userId: user._id });
-    } else if (type === "otp") {
-      const user = await User.findOne({ email });
-
-      if (!user) {
-        return res
-          .status(404)
-          .json({ message: "User not found. Please sign up first." });
-      }
-
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-      await sendOtpEmail(email, otpCode);
-
-      await Otp.create({
-        user: user._id,
-        otp: otpCode,
-        expiresAt: Date.now() + 10 * 60 * 1000,
-        otpAttempts: 0,
-      });
-
-      res
-        .status(200)
-        .json({ message: "OTP sent to your email.", userId: user._id });
+    if (!email) {
+        return res.status(400).json({ message: "Email is required" });
     }
-  } catch (error) {
-    console.error("Error during login:", error);
-    res
-      .status(500)
-      .json({ message: "Internal server error", error: error.message });
-  }
+
+    if (!password) {
+        return res.status(400).json({ message: "Password is required" });
+    }
+
+    try {
+        if (password && type === 'password') {
+            const user = await User.findOne({ email });
+
+            if (!user) {
+                return res.status(401).json({ message: "User not found. Please sign up first." });
+            }
+
+            const isPasswordValid = await bcrypt.compare(password, user.password);
+
+            if (!isPasswordValid) {
+                return res.status(401).json({ message: "Invalid email or password" });
+            }
+
+            // Check if auto-logout is enabled for this login
+            const enableAutoLogout = req.body.enableAutoLogout === true || req.body.enableAutoLogout === "true";
+            const tokenExpiry = enableAutoLogout ? "5m" : "72h";
+            
+            const token = jwt.sign(
+                { userId: user._id, email: user.email, role: user.role },
+                process.env.JWT_SECRET,
+                { expiresIn: tokenExpiry }
+            );
+
+            const response = { 
+                message: "Login successful", 
+                token: token, 
+                userId: user._id,
+                autoLogoutEnabled: enableAutoLogout
+            };
+
+            if (enableAutoLogout) {
+                // Create session in Redis with 5 minute expiry
+                await redisClient.setEx(`session:${user._id}`, 300, JSON.stringify({
+                    userId: user._id,
+                    lastActivity: Date.now()
+                }));
+            }
+
+            res.status(200).json(response);
+        } else if (type === 'otp') {
+            const user = await User.findOne({ email });
+
+            if (!user) {
+                return res
+                .status(404)
+                .json({ message: "User not found. Please sign up first." });
+            }
+
+            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+            await sendOtpEmail(email, otpCode);
+
+            await Otp.create({
+                user: user._id,
+                otp: otpCode,
+                expiresAt: Date.now() + 10 * 60 * 1000,
+                otpAttempts: 0
+            });
+
+            res
+            .status(200)
+            .json({ message: "OTP sent to your email.", userId: user._id });
+        }
+    } catch (error) {
+        console.error("Error during login:", error);
+        res
+        .status(500)
+        .json({ message: "Internal server error", error: error.message });
+    }
 };
+
 
 /* -------------------------------------------------------------------------- */
 /*                           OTP VERIFICATION                                 */
 /* -------------------------------------------------------------------------- */
 
-const verifyOtp = async (req, res) => {
-  const { userId, otp } = req.body;
+// const verifyOtp = async (req, res) => {
+//   const { userId, otp } = req.body;
 
-  if (!userId || !otp) {
-    return res.status(400).json({ message: "User ID and OTP are required" });
-  }
+//   if (!userId || !otp) {
+//     return res.status(400).json({ message: "User ID and OTP are required" });
+//   }
 
-  try {
-    if (!isValidObjectId(userId)) {
-      return res.status(400).json({ message: "Invalid user ID." });
-    }
+//   try {
+//     if (!isValidObjectId(userId)) {
+//       return res.status(400).json({ message: "Invalid user ID." });
+//     }
 
-    const otpRecord = await Otp.findOne({ user: userId, otp });
+//     const otpRecord = await Otp.findOne({ user: userId, otp });
 
-    if (!otpRecord) {
-      // Validate user ID
-      return res.status(400).json({ message: "Invalid OTP" });
-    }
+//     if (!otpRecord) {
+//       // Validate user ID
+//       return res.status(400).json({ message: "Invalid OTP" });
+//     }
 
-    if (otpRecord.expiresAt < Date.now()) {
-      await Otp.deleteOne({ user: userId, otp });
-      // Find OTP record for the user
-      await User.deleteOne({ _id: userId });
-      return res
-        .status(400)
-        .json({ message: "OTP has expired. User account deleted." });
-    }
+//     if (otpRecord.expiresAt < Date.now()) {
+//       await Otp.deleteOne({ user: userId, otp });
+//       // Find OTP record for the user
+//       await User.deleteOne({ _id: userId });
+//       return res
+//         .status(400)
+//         .json({ message: "OTP has expired. User account deleted." });
+//     }
 
-    if (otpRecord.attempts >= 3) {
-      await Otp.deleteOne({ user: userId, otp });
-      // Check if OTP has expired
-      await User.deleteOne({ _id: userId });
-      return res
-        .status(400)
-        .json({ message: "Maximum attempts exceeded. User account deleted." });
-    }
+//     if (otpRecord.attempts >= 3) {
+//       await Otp.deleteOne({ user: userId, otp });
+//       // Check if OTP has expired
+//       await User.deleteOne({ _id: userId });
+//       return res
+//         .status(400)
+//         .json({ message: "Maximum attempts exceeded. User account deleted." });
+//     }
 
-    if (otpRecord.otp === otp) {
-      await Otp.deleteOne({ user: userId, otp });
-      // Check if maximum attempts have been exceeded
-      const user = await User.findById(userId);
-      const token = jwt.sign(
-        { userId: user._id, email: user.email, role: user.role },
-        // Validate OTP
-        process.env.JWT_SECRET,
-        { expiresIn: "24h" }
-      );
+//     if (otpRecord.otp === otp) {
+//       await Otp.deleteOne({ user: userId, otp });
+//       // Check if maximum attempts have been exceeded
+//       const user = await User.findById(userId);
+//       const token = jwt.sign(
+//         { userId: user._id, email: user.email, role: user.role },
+//         // Validate OTP
+//         process.env.JWT_SECRET,
+//         { expiresIn: "24h" }
+//       );
 
-      res
-        .status(200)
-        .json({ message: "OTP verified successfully", token, user: user._id });
-    } else {
-      otpRecord.attempts += 1;
-      await otpRecord.save();
-      res.status(400).json({ message: "Invalid OTP" });
-      // Increment attempts if OTP is invalid
-    }
-  } catch (error) {
-    console.error("Error during OTP verification:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to verify OTP", error: error.message });
-  }
-};
+//       res
+//         .status(200)
+//         .json({ message: "OTP verified successfully", token, user: user._id });
+//     } else {
+//       otpRecord.attempts += 1;
+//       await otpRecord.save();
+//       res.status(400).json({ message: "Invalid OTP" });
+//       // Increment attempts if OTP is invalid
+//     }
+//   } catch (error) {
+//     console.error("Error during OTP verification:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to verify OTP", error: error.message });
+//   }
+// };
 
 /* -------------------------------------------------------------------------- */
 /*                           FORGOT PASSWORD                                  */
 /* -------------------------------------------------------------------------- */
 
-const forgotPassword = async (req, res) => {
-  const { userId, newPassword } = req.body;
+// const forgotPassword = async (req, res) => {
+//   const { userId, newPassword } = req.body;
 
-  try {
-    if (!isValidObjectId(userId)) {
-      return res.status(400).json({ message: "Invalid user ID." });
-    }
+//   try {
+//     if (!isValidObjectId(userId)) {
+//       return res.status(400).json({ message: "Invalid user ID." });
+//     }
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+//     const user = await User.findById(userId);
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-    user.password = hashedPassword;
-    await user.save();
-    res.status(200).json({ message: "Password reset successful" });
-  } catch (error) {
-    console.error("Error during password reset:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to reset password", error: error.message });
-  }
-};
+//     const salt = await bcrypt.genSalt(10);
+//     const hashedPassword = await bcrypt.hash(newPassword, salt);
+//     user.password = hashedPassword;
+//     await user.save();
+//     res.status(200).json({ message: "Password reset successful" });
+//   } catch (error) {
+//     console.error("Error during password reset:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to reset password", error: error.message });
+//   }
+// };
 
 /* -------------------------------------------------------------------------- */
 /*                           REMOVE USER BY ID                                */
@@ -358,12 +451,10 @@ const updateUserDetails = async (req, res) => {
     // If the role is 'evaluator', check if additional fields are provided
     if (role === "evaluator") {
       if (!subjectCode || !maxBooklets) {
-        return res
-          .status(400)
-          .json({
-            message:
-              "Subject code and max booklets are required for evaluator role",
-          });
+        return res.status(400).json({
+          message:
+            "Subject code and max booklets are required for evaluator role",
+        });
       }
     }
 
@@ -380,7 +471,6 @@ const updateUserDetails = async (req, res) => {
     if (subjectCode) updateData.subjectCode = subjectCode; // This is an array field
     if (maxBooklets) updateData.maxBooklets = maxBooklets;
     if (changepassword) updateData.password = hashedPassword;
-    
 
     // Update the user in the database
     const user = await User.findByIdAndUpdate(id, updateData, { new: true });
@@ -609,11 +699,59 @@ const passwordReset = async (req, res) => {
   }
 };
 
+/* -------------------------------------------------------------------------- */
+/*                           AUTO LOGOUT MIDDLEWARE                           */
+/* -------------------------------------------------------------------------- */
+
+const checkIdleTimeout = async (req, res, next) => {
+    const token = req?.headers?.authorization?.split(" ")[1];
+    
+    if (!token) {
+        return res.status(401).json({ message: "No token provided" });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.userId;
+        
+        // Check if session exists in Redis
+        const session = await redisClient.get(`session:${userId}`);
+        
+        if (!session) {
+            return res.status(401).json({ 
+                message: "Session expired due to 5 minute inactivity",
+                autoLogout: true 
+            });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Update session activity - extend for another 5 minutes
+        // // 300 seconds = 5 minutes
+        await redisClient.setEx(`session:${userId}`, 300, JSON.stringify({
+            userId: userId,
+            lastActivity: Date.now()
+        }));
+
+        req.user = user;
+        next();
+    } catch (error) {
+        return res.status(401).json({ 
+            message: "Invalid token", 
+            autoLogout: true 
+        });
+    }
+};
+
+
 export {
   createUser,
   userLogin,
-  verifyOtp,
-  forgotPassword,
+  // verifyOtp,
+  // forgotPassword,
   removeUser,
   getUserById,
   getAllUsers,
@@ -622,4 +760,5 @@ export {
   otpVerify,
   passwordReset,
   createUsersByCsvFile,
+  checkIdleTimeout
 };

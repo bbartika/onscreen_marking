@@ -22,8 +22,10 @@ const uploadedMiddleware = multer({
 
     if (ext !== ".zip" && ext !== ".pdf") {
       return cb(
-        new Error("Only PDF or ZIP files are allowed"),
-        false
+        new multer.MulterError(
+          "LIMIT_UNEXPECTED_FILE",
+          "Only PDF or ZIP files are allowed"
+        )
       );
     }
 

@@ -16,6 +16,23 @@
       "height": 80,
       "synced": false,
       "mark": 2
+    },
+    {
+      "id": "1/10/2026, 12:39:53 PM",
+      "taskId": "69535296c7a12c69028e470c",
+      "page": "3",
+      "answerPdfImageId": "6958b836ec5cd1c1f7d574d8",
+      "answerPdfId": "69535296c7a12c69028e470f",
+      "userId": "693a9fc22571b1f2f9194d42",
+      "iconUrl": "/check.png",
+      "question": 2,
+      "timeStamps": "1/10/2026, 12:39:53 PM",
+      "x": 1015.8124847412109,
+      "y": 793.6319580078125,
+      "width": 150,
+      "height": 80,
+      "synced": false,
+      "mark": 2
     }
   ],
   "comments": []

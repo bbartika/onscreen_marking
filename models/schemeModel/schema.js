@@ -43,7 +43,6 @@ const schemaSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-    
     numberOfPage: {
         type: Number,
         require: true
@@ -51,6 +50,19 @@ const schemaSchema = new mongoose.Schema({
     hiddenPage: {
         type: [String],
         required: true
+    },
+    supplimentaryPdfPath:{
+        type: String,
+        default: null
+    },
+    supplimentaryImagesLength:{
+        type: Number,
+        default: 0
+    },
+    supplimenteryProcessingStatus:{
+        type: String,
+        enum: ["pending", "processing", "completed", "failed"],
+        default: "pending"
     },
     isActive: {
         type: Boolean,

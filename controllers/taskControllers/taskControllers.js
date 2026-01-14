@@ -18,6 +18,7 @@ import Subject from "../../models/classModel/subjectModel.js";
 import SubjectFolderModel from "../../models/StudentModels/subjectFolderModel.js";
 import Icon from "../../models/EvaluationModels/iconModel.js";
 import { subjectsWithTasks } from "../classControllers/subjectControllers.js";
+// import { ConversationsMessageFile } from "sib-api-v3-sdk";
 
 const assigningTask = async (req, res) => {
   const { userId, subjectCode, bookletsToAssign } = req.body;
@@ -312,6 +313,8 @@ const autoAssigning = async (req, res) => {
       ).lean()
     )?.unAllocated;
 
+    console.log("unallocated-pdfs", unallocatedPdfs);
+
     // 2. FIRST TIME running → treat all PDFs as unallocated
     if (unallocatedPdfs === undefined) {
       unallocatedPdfs = allPdfs.length;
@@ -322,12 +325,12 @@ const autoAssigning = async (req, res) => {
     // 3. Extract only remaining unallocated PDFs
     let newPdfs;
 
-    if (unallocatedPdfs === allPdfs.length) {
-      // first run → assign everything
-      newPdfs = allPdfs;
-    } else {
-      // assign last unAllocated PDFs
+    if (unallocatedPdfs > 0) {
+      // only take remaining PDFs
       newPdfs = allPdfs.slice(-unallocatedPdfs);
+    } else {
+      // unallocatedPdfs === 0
+      newPdfs = [];
     }
 
     console.log("PDFs to be assigned now:", newPdfs);
@@ -341,6 +344,10 @@ const autoAssigning = async (req, res) => {
 
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
+
+    console.log("new-pdf", newPdfs.length);
+
+    console.log("all-pdfs", allPdfs.length);
 
     // ⭐ MAIN ASSIGNMENT LOOP ⭐
     for (const pdfFile of newPdfs) {

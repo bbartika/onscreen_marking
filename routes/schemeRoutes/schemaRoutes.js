@@ -1,8 +1,11 @@
 import express from "express";
 const router = express.Router();
 
-import { createSchema, updateSchema, getSchemaById, getAllSchemas, removeSchema, getAllCompletedSchema } from "../../controllers/schemeControllers/schemaControllers.js";
+import { createSchema, updateSchema, getSchemaById, getAllSchemas, removeSchema, getAllCompletedSchema, uploadSupplimentaryPdf } from "../../controllers/schemeControllers/schemaControllers.js";
 import authMiddleware from "../../Middlewares/authMiddleware.js";
+
+
+import  uploadSupplimentaryPdfMiddleware  from "../../Middlewares/uploadSupplimentaryMiddleware.js";
 
 /* -------------------------------------------------------------------------- */
 /*                           SCHEMA ROUTES                                    */
@@ -14,5 +17,9 @@ router.delete("/remove/schema/:id", authMiddleware, removeSchema);
 router.get("/get/schema/:id", authMiddleware, getSchemaById);
 router.get("/getall/schema", getAllSchemas);
 router.get("/getall/completed/schema", authMiddleware, getAllCompletedSchema);
+
+
+
+router.post("/uploadSupplimentarypdf/:schemaId", authMiddleware, uploadSupplimentaryPdfMiddleware, uploadSupplimentaryPdf);
 
 export default router;

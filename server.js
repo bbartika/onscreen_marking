@@ -7,6 +7,7 @@ import { Server } from "socket.io";
 import http from "http";
 import database from "./utils/database.js";
 import createInitialUser from "./services/initialUserCreation.js";
+import { connectRedis } from "./services/redisClient.js";
 
 
 import authRoutes from "./routes/authRoutes/authRoutes.js";
@@ -90,16 +91,29 @@ app.use('/api/resultgeneration', resultGenerationRoutes);
 app.use('/api/analytic', analyticRoutes);
 
 app.use((err, req, res, next) => {
-  if (
-    err.code === "LIMIT_UNEXPECTED_FILE" ||
-    err.message.includes("Only ZIP folder or single PDF")
-  ) {
+  // Multer file format errors
+  if (err instanceof multer.MulterError) {
+    if (err.message.includes("Only PDF or ZIP")) {
+      return res.status(400).json({
+        message: "Only single PDF file or ZIP folder is allowed",
+      });
+    }
+
     return res.status(400).json({
-      message: "Only ZIP folder or single PDF file will be accepted"
+      message: err.message,
     });
   }
+
+  // Custom file errors
+  if (err.message && err.message.includes("Only PDF or ZIP")) {
+    return res.status(400).json({
+      message: "Only single PDF file or ZIP folder is allowed",
+    });
+  }
+
+  // Fallback
   return res.status(500).json({
-    message: err.message || "Internal Server Error"
+    message: "Upload failed",
   });
 });
 
@@ -125,6 +139,7 @@ handleAnalyticsSocket (io);
 server.listen(PORT, async () => {
     try {
         await database();
+        await connectRedis();
         await createInitialUser();
         console.log(`Server running on http://localhost:${PORT}`);
     } catch (error) {

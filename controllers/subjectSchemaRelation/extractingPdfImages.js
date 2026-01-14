@@ -95,7 +95,7 @@
 //   });
 // };
 
-// export default extractImagesFromPdf;
+export default extractImagesFromPdf;
 
 import fs from "fs";
 import path from "path";

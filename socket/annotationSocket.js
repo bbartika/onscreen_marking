@@ -369,7 +369,10 @@ export default function handleAnnotationSocket(io) {
           annotationIds,
           questionName,
           allottedMarks,
+          parentQuestionId
         } = data;
+
+        console.log("data", data);
         console.log(`🗑️ Deleting annotation from task ${taskId}, page ${page}`);
 
         if (!userId || !answerPdfId || page === undefined || page === null) {
@@ -485,6 +488,44 @@ export default function handleAnnotationSocket(io) {
         } else {
           console.log("❌ Question not found in questionMarksData.json:");
         }
+
+        console.log("parentIndex for delete", parentQuestionId);
+
+        if (parentQuestionId) {
+          const parentIndex = questionMarksData.marks.findIndex(
+            (m) => m._id === parentQuestionId
+          );
+          console.log("parentIndex", parentIndex);
+
+          if (parentIndex !== -1) {
+            const existingMarks = questionMarksData.marks[parentIndex].allottedMarks || 0;
+            console.log("existingMarks for parent", existingMarks);
+
+            const newMarks = data.allottedMarks || 0;
+            console.log("newMarks for parent", newMarks);
+
+            const totalMarks = existingMarks - newMarks;
+            console.log("totalMarks for parent", totalMarks);
+
+            questionMarksData.marks[parentIndex] = {
+              ...questionMarksData.marks[parentIndex],
+              allottedMarks: totalMarks,
+              isMarked: true,
+              updatedAt: new Date().toISOString(),
+            };
+            
+          }
+
+          saveMarksData(userId, answerPdfId, questionMarksData);
+          console.log(
+            "questionMarksData after processing:",
+            questionMarksData.marks[parentIndex]
+          );
+        }
+
+        
+
+        
 
         console.log("DELETE INPUT VALIDATION CHECK:", {
           userId,
@@ -637,6 +678,8 @@ export default function handleAnnotationSocket(io) {
           synced: data.synced !== undefined ? data.synced : false,
         };
 
+        console.log("question-number", marksObject.parentQuestionId);
+
         const existingMarksIndex = marksData.marks.findIndex(
           (mark) => mark.question === marksObject.question
         );
@@ -669,20 +712,6 @@ export default function handleAnnotationSocket(io) {
             "❌ Mark not found in marksData.json with ID:",
             marksObject.id
           );
-        }
-
-        if (marksObject.parentQuestionId) {
-          const parentIndex = marksData.marks.findIndex(
-            (m) => m._id === marksObject.parentQuestionId
-          );
-
-          if (parentIndex !== -1) {
-            marksData.marks[parentIndex].allottedMarks +=
-              marksObject.allottedMarks;
-
-            marksData.marks[parentIndex].isMarked = true;
-            marksData.marks[parentIndex].updatedAt = new Date().toISOString();
-          }
         }
 
         saveMarks(userId, answerPdfId, marksData);
@@ -747,15 +776,37 @@ export default function handleAnnotationSocket(io) {
           const parentIndex = questionMarksData.marks.findIndex(
             (m) => m._id === marksObject.parentQuestionId
           );
+          console.log("parentIndex", parentIndex);
 
           if (parentIndex !== -1) {
-            questionMarksData.marks[parentIndex].allottedMarks +=
-              marksObject.allottedMarks;
+            const existingMarks = questionMarksData.marks[parentIndex].allottedMarks || 0;
+            console.log("existingMarks for parent", existingMarks);
 
-            questionMarksData.marks[parentIndex].isMarked = true;
-            questionMarksData.marks[parentIndex].updatedAt = new Date().toISOString();
+            const newMarks = marksObject.allottedMarks || 0;
+            console.log("newMarks for parent", newMarks);
+
+            const totalMarks = existingMarks + newMarks;
+            console.log("totalMarks for parent", totalMarks);
+
+            questionMarksData.marks[parentIndex] = {
+              ...questionMarksData.marks[parentIndex],
+              allottedMarks: totalMarks,
+              isMarked: true,
+              updatedAt: new Date().toISOString(),
+            };
+            
           }
+
+          saveMarksData(userId, answerPdfId, questionMarksData);
+          console.log(
+            "questionMarksData after processing:",
+            questionMarksData.marks[parentIndex]
+          );
         }
+
+        
+
+        
 
         const roomName = `task_${taskId}`;
         io.to(roomName).emit("marks-updated", {
