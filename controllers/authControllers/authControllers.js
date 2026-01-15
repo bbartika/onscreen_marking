@@ -4,8 +4,10 @@ import bcrypt from "bcryptjs";
 import sendOtpEmail from "../../services/otpService.js";
 import jwt from "jsonwebtoken";
 import { isValidObjectId } from "../../services/mongoIdValidation.js";
+import UserLoginLog from "../../models/authModels/UserLoginLog.js";
 
 import crypto from "crypto";
+import redisClient from "../../services/redisClient.js";
 import sendEmail from "../../utils/sendEmail.js";
 import { saveOtp, getOtp, deleteOtp } from "../../utils/otpStore.js";
 import mongoose from "mongoose";
@@ -48,7 +50,7 @@ const createUser = async (req, res) => {
   const session = await mongoose.startSession();
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  // const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  // const otpCode = Math.floor(100000 + Math.random() * 900000).toString(); 
 
   if (password) {
     await sendEmail(
@@ -194,15 +196,29 @@ const userLogin = async (req, res) => {
                 return res.status(401).json({ message: "Invalid email or password" });
             }
 
-            // Check if auto-logout is enabled for this login
+            // Check if auto-logout is enabled for this login 
             const enableAutoLogout = req.body.enableAutoLogout === true || req.body.enableAutoLogout === "true";
             const tokenExpiry = enableAutoLogout ? "5m" : "72h";
+
+            // 🔐 create unique session id (per device login)
+            const sessionId = crypto.randomUUID();
             
             const token = jwt.sign(
-                { userId: user._id, email: user.email, role: user.role },
+                { userId: user._id, email: user.email, role: user.role, sessionId },
                 process.env.JWT_SECRET,
                 { expiresIn: tokenExpiry }
             );
+
+            //Tracking User Login Logs
+            await UserLoginLog.create({
+              userId: user._id,
+              sessionId,
+              loginAt: new Date(),
+              ip: req.ip,
+              userAgent: req.headers["user-agent"]
+            });
+
+            await redisClient.set(`user:session:${user._id}`, sessionId);
 
             const response = { 
                 message: "Login successful", 
@@ -218,6 +234,10 @@ const userLogin = async (req, res) => {
                     lastActivity: Date.now()
                 }));
             }
+
+            // 🔥 MARK USER ONLINE
+            await redisClient.setEx(`online:user:${user._id}`, 300, "1");
+            await redisClient.sAdd("online:users", String(user._id));
 
             res.status(200).json(response);
         } else if (type === 'otp') {
@@ -239,6 +259,10 @@ const userLogin = async (req, res) => {
                 expiresAt: Date.now() + 10 * 60 * 1000,
                 otpAttempts: 0
             });
+
+            // 🔥 MARK USER ONLINE
+            await redisClient.setEx(`online:user:${user._id}`, 300, "1");
+            await redisClient.sAdd("online:users", String(user._id));
 
             res
             .status(200)
@@ -746,6 +770,41 @@ const checkIdleTimeout = async (req, res, next) => {
     }
 };
 
+/* -------------------------------------------------------------------------- */
+/*                           REMOVE OFFLINE USERS                           */
+/* -------------------------------------------------------------------------- */
+
+const getOnlineUsers = async (req, res) => {
+  try {
+    const userIds = await redisClient.sMembers("online:users");
+
+    const onlineUsers = [];
+
+    for (const userId of userIds) {
+      const isAlive = await redisClient.exists(`online:user:${userId}`);
+
+      if (isAlive) {
+        const user = await User.findById(userId).select("_id name email role");
+        if (user) {
+          onlineUsers.push({
+            ...user.toObject(),
+            status: "online"
+          });
+        }
+      }else {
+  await redisClient.sRem("online:users", userId);
+}
+    }
+
+    res.status(200).json({
+      count: onlineUsers.length,
+      users: onlineUsers,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch online users" });
+  }
+};
+
 
 export {
   createUser,
@@ -753,6 +812,7 @@ export {
   // verifyOtp,
   // forgotPassword,
   removeUser,
+  getOnlineUsers,
   getUserById,
   getAllUsers,
   updateUserDetails,
