@@ -39,6 +39,30 @@ const authMiddleware = async (req, res, next) => {
     
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // 🔒 SINGLE DEVICE CHECK
+        const activeSessionId = await redisClient.get(
+          `user:session:${decoded.userId}`
+        );
+
+        if (!activeSessionId || activeSessionId !== decoded.sessionId) {
+            await UserLoginLog.findOneAndUpdate(
+                {
+                  userId: decoded.userId,
+                  sessionId: decoded.sessionId,
+                  logoutAt: null
+                },
+                {
+                  logoutAt: new Date(),
+                  logoutReason: "Logged in from another device"
+                }
+            );
+
+          return res.status(401).json({
+            message: "You have been logged out because you logged in on another device",
+            forceLogout: true
+          });
+        }
+
         const user = await User.findById(decoded.userId);
         
         if (!user) {
@@ -54,6 +78,18 @@ const authMiddleware = async (req, res, next) => {
             const session = await redisClient.get(`session:${decoded.userId}`);
             
             if (!session) {
+                await UserLoginLog.findOneAndUpdate(
+                    {
+                      userId: decoded.userId,
+                      sessionId: decoded.sessionId,
+                      logoutAt: null
+                    },
+                    {
+                      logoutAt: new Date(),
+                      logoutReason: "Auto logout (inactivity)"
+                    }
+                );
+
                 return res.status(401).json({ 
                     message: "Session expired due to 5 minute inactivity",
                     autoLogout: true 
@@ -68,6 +104,16 @@ const authMiddleware = async (req, res, next) => {
         }
         
         req.user = user;
+
+        // 🔁 Refresh online heartbeat
+        await redisClient.setEx(
+          `online:user:${user._id}`,
+          300, // extend online status
+          "1"
+        );
+
+        await redisClient.sAdd("online:users", String(user._id));
+
         next();
     } catch (error) {
         return res.status(401).json({ message: "Unauthorized" });
