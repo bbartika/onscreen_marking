@@ -8,6 +8,7 @@ import {
     // verifyOtp,
     // forgotPassword,
     removeUser,
+    getOnlineUsers,
     getUserById,
     getAllUsers,
     updateUserDetails,
@@ -22,6 +23,7 @@ router.post('/signup', authMiddleware, createUser);
 router.post('/signin', userLogin);
 // router.post('/verify', verifyOtp);
 router.post('/createuserbycsv', authMiddleware, createUsersByCsvFile);
+router.get("/online/users", authMiddleware, getOnlineUsers);
 router.post('/send-otp',  otpSend);
 router.post('/verify-otp', otpVerify);
 router.post('/reset-password', passwordReset);

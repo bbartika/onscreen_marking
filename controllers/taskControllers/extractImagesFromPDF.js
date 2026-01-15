@@ -1,112 +1,19 @@
-import fs from "fs";
-import path from "path";
-import { spawn } from "child_process";
-
-const POPPLER_PATH = "C:\\poppler\\poppler-24.02.0\\Library\\bin\\pdftoppm.exe";
-
-/**
- * Extract PDF pages as PNG images using Poppler (pdftoppm)
- * @param {string} pdfPath - Absolute path to PDF file
- * @param {string} outputDir - Directory to save images
- * @returns {Promise<string[]>} - Array of image filenames in correct order
- */
-const extractImagesFromPdf = (pdfPath, outputDir) => {
-  return new Promise((resolve, reject) => {
-    if (!fs.existsSync(pdfPath)) {
-      return reject(new Error("PDF file does not exist"));
-    }
-
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
-    const outputPrefix = path.join(outputDir, "page");
-
-    console.log("Using Poppler:", POPPLER_PATH);
-    console.log("PDF exists:", fs.existsSync(pdfPath));
-
-    // 🔑 Spawn Poppler process
-    const poppler = spawn(
-      POPPLER_PATH,
-      [
-        "-png",
-        "-scale-to-x",
-        "600",
-        "-scale-to-y",
-        "-1",
-        pdfPath,
-        outputPrefix,
-      ],
-      {
-        windowsHide: true,
-      }
-    );
-
-    let stderr = "";
-
-    poppler.stderr.on("data", (data) => {
-      stderr += data.toString();
-    });
-
-    poppler.on("error", (err) => {
-      reject(err); // DO NOT hide the real error
-    });
-
-    // ⏱ Safety timeout (optional but recommended)
-    const timeout = setTimeout(() => {
-      poppler.kill("SIGKILL");
-      reject(new Error("Poppler process timed out"));
-    }, 60_000);
-
-    poppler.on("close", (code) => {
-      clearTimeout(timeout);
-
-      if (code !== 0) {
-        return reject(new Error(`Poppler failed with code ${code}: ${stderr}`));
-      }
-
-      // Read generated images
-      const files = fs
-        .readdirSync(outputDir)
-        .filter(
-          (file) =>
-            file.startsWith("page") && file.toLowerCase().endsWith(".png")
-        )
-        .sort((a, b) => {
-          const numA = parseInt(a.match(/\d+/)[0], 10);
-          const numB = parseInt(b.match(/\d+/)[0], 10);
-          return numA - numB;
-        });
-
-      // Rename sequentially → image_1.png, image_2.png, ...
-      const finalImages = [];
-
-      files.forEach((file, index) => {
-        const oldPath = path.join(outputDir, file);
-        const newName = `image_${index + 1}.png`;
-        const newPath = path.join(outputDir, newName);
-
-        fs.renameSync(oldPath, newPath);
-        finalImages.push(newName);
-      });
-
-      resolve(finalImages);
-    });
-  });
-};
-
-export default extractImagesFromPdf;
-
-
-
 // import fs from "fs";
 // import path from "path";
 // import { spawn } from "child_process";
 
+// const POPPLER_PATH = "C:\\poppler\\poppler-24.02.0\\Library\\bin\\pdftoppm.exe";
+
+// /**
+//  * Extract PDF pages as PNG images using Poppler (pdftoppm)
+//  * @param {string} pdfPath - Absolute path to PDF file
+//  * @param {string} outputDir - Directory to save images
+//  * @returns {Promise<string[]>} - Array of image filenames in correct order
+//  */
 // const extractImagesFromPdf = (pdfPath, outputDir) => {
 //   return new Promise((resolve, reject) => {
 //     if (!fs.existsSync(pdfPath)) {
-//       return reject(new Error("PDF file not found"));
+//       return reject(new Error("PDF file does not exist"));
 //     }
 
 //     if (!fs.existsSync(outputDir)) {
@@ -115,13 +22,25 @@ export default extractImagesFromPdf;
 
 //     const outputPrefix = path.join(outputDir, "page");
 
-//     const poppler = spawn("pdftoppm", [
-//       "-png",
-//       "-r",
-//       "150",
-//       pdfPath,
-//       outputPrefix,
-//     ]);
+//     console.log("Using Poppler:", POPPLER_PATH);
+//     console.log("PDF exists:", fs.existsSync(pdfPath));
+
+//     // 🔑 Spawn Poppler process
+//     const poppler = spawn(
+//       POPPLER_PATH,
+//       [
+//         "-png",
+//         "-scale-to-x",
+//         "600",
+//         "-scale-to-y",
+//         "-1",
+//         pdfPath,
+//         outputPrefix,
+//       ],
+//       {
+//         windowsHide: true,
+//       }
+//     );
 
 //     let stderr = "";
 
@@ -129,42 +48,122 @@ export default extractImagesFromPdf;
 //       stderr += data.toString();
 //     });
 
-//     poppler.on("error", () => {
-//       reject(new Error("Failed to start Poppler process"));
+//     poppler.on("error", (err) => {
+//       reject(err); // DO NOT hide the real error
 //     });
 
+//     // ⏱ Safety timeout (optional but recommended)
+//     const timeout = setTimeout(() => {
+//       poppler.kill("SIGKILL");
+//       reject(new Error("Poppler process timed out"));
+//     }, 60_000);
+
 //     poppler.on("close", (code) => {
+//       clearTimeout(timeout);
+
 //       if (code !== 0) {
-//         return reject(
-//           new Error(`Poppler failed with code ${code}: ${stderr}`)
-//         );
+//         return reject(new Error(`Poppler failed with code ${code}: ${stderr}`));
 //       }
 
-//       const images = fs
+//       // Read generated images
+//       const files = fs
 //         .readdirSync(outputDir)
 //         .filter(
-//           (f) => f.startsWith("page") && f.toLowerCase().endsWith(".png")
+//           (file) =>
+//             file.startsWith("page") && file.toLowerCase().endsWith(".png")
 //         )
 //         .sort((a, b) => {
-//           const nA = parseInt(a.match(/\d+/)[0], 10);
-//           const nB = parseInt(b.match(/\d+/)[0], 10);
-//           return nA - nB;
+//           const numA = parseInt(a.match(/\d+/)[0], 10);
+//           const numB = parseInt(b.match(/\d+/)[0], 10);
+//           return numA - numB;
 //         });
 
-//       const renamedImages = [];
+//       // Rename sequentially → image_1.png, image_2.png, ...
+//       const finalImages = [];
 
-//       images.forEach((file, index) => {
+//       files.forEach((file, index) => {
 //         const oldPath = path.join(outputDir, file);
 //         const newName = `image_${index + 1}.png`;
 //         const newPath = path.join(outputDir, newName);
 
 //         fs.renameSync(oldPath, newPath);
-//         renamedImages.push(newName);
+//         finalImages.push(newName);
 //       });
 
-//       resolve(renamedImages);
+//       resolve(finalImages);
 //     });
 //   });
 // };
 
 // export default extractImagesFromPdf;
+
+
+import fs from "fs";
+import path from "path";
+import { spawn } from "child_process";
+
+const extractImagesFromPdf = (pdfPath, outputDir) => {
+  return new Promise((resolve, reject) => {
+    if (!fs.existsSync(pdfPath)) {
+      return reject(new Error("PDF file not found"));
+    }
+
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const outputPrefix = path.join(outputDir, "page");
+
+    const poppler = spawn("pdftoppm", [
+      "-png",
+      "-r",
+      "150",
+      pdfPath,
+      outputPrefix,
+    ]);
+
+    let stderr = "";
+
+    poppler.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    poppler.on("error", () => {
+      reject(new Error("Failed to start Poppler process"));
+    });
+
+    poppler.on("close", (code) => {
+      if (code !== 0) {
+        return reject(
+          new Error(`Poppler failed with code ${code}: ${stderr}`)
+        );
+      }
+
+      const images = fs
+        .readdirSync(outputDir)
+        .filter(
+          (f) => f.startsWith("page") && f.toLowerCase().endsWith(".png")
+        )
+        .sort((a, b) => {
+          const nA = parseInt(a.match(/\d+/)[0], 10);
+          const nB = parseInt(b.match(/\d+/)[0], 10);
+          return nA - nB;
+        });
+
+      const renamedImages = [];
+
+      images.forEach((file, index) => {
+        const oldPath = path.join(outputDir, file);
+        const newName = `image_${index + 1}.png`;
+        const newPath = path.join(outputDir, newName);
+
+        fs.renameSync(oldPath, newPath);
+        renamedImages.push(newName);
+      });
+
+      resolve(renamedImages);
+    });
+  });
+};
+
+export default extractImagesFromPdf;
