@@ -18,6 +18,8 @@ const createSchema = async (req, res) => {
     isActive,
     numberOfPage,
     hiddenPage,
+    numberOfSupplement,
+    PageofSupplement
   } = req.body;
 
   try {
@@ -85,6 +87,8 @@ const createSchema = async (req, res) => {
       hiddenPage,
       isActive,
       status: false,
+      numberOfSupplement,
+      PageofSupplement
     });
 
     const savedSchema = await newSchema.save();
@@ -115,6 +119,8 @@ const updateSchema = async (req, res) => {
     isActive,
     numberOfPage,
     hiddenPage,
+    numberOfSupplement,
+    PageofSupplement
   } = req.body;
 
   console.log("Update schema called with:", {
@@ -129,6 +135,8 @@ const updateSchema = async (req, res) => {
     isActive,
     numberOfPage,
     hiddenPage,
+    numberOfSupplement,
+    PageofSupplement
   });
 
   try {
@@ -230,6 +238,8 @@ if (existingParentCount > newTotal) {
     schema.numberOfPage = numberOfPage;
     schema.hiddenPage = hiddenPage;
     schema.status = status;
+    schema.numberOfSupplement = numberOfSupplement;
+    schema.PageofSupplement = PageofSupplement;
 
     const updatedSchema = await schema.save();
     return res.status(200).json(updatedSchema);
@@ -244,21 +254,6 @@ if (existingParentCount > newTotal) {
 /* -------------------------------------------------------------------------- */
 /*                           GET SCHEMA BY ID                                 */
 /* -------------------------------------------------------------------------- */
-const getSchemaById = async (req, res) => {
-  const { id } = req.params;
-  try {
-    const schema = await Schema.findById(id);
-    if (!schema) {
-      return res.status(404).json({ message: "Schema not found." });
-    }
-    return res.status(200).json(schema);
-  } catch (error) {
-    console.error(error);
-    return res
-      .status(500)
-      .json({ message: "An error occurred while retrieving the schema." });
-  }
-};
 
 /* -------------------------------------------------------------------------- */
 /*                           GET ALL SCHEMA                                   */
@@ -275,6 +270,21 @@ const getAllSchemas = async (req, res) => {
   }
 };
 
+const getSchemaById = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const schema = await Schema.findById(id);
+    if (!schema) {
+      return res.status(404).json({ message: "Schema not found." });
+    }
+    return res.status(200).json(schema);
+  } catch (error) {
+    console.error(error);
+    return res
+      .status(500)
+      .json({ message: "An error occurred while retrieving the schema." });
+  }
+};
 /* -------------------------------------------------------------------------- */
 /*                           REMOVE SCHEMA BY ID                              */
 /* -------------------------------------------------------------------------- */
@@ -403,6 +413,38 @@ const uploadSupplimentaryPdf = async (req, res) => {
   }
 };
 
+const getSchemadetailsById = async (req, res) => {
+  const {id } = req.params;
+
+  try{
+
+    // if (!isValidObjectId(id)) {
+    //   return res
+    //     .status(400)
+    //     .json({ message: "Invalid subject schema relation ID." });
+    // }
+
+    const schemaDetails = await Schema.findById({
+      _id: id,
+    });
+
+    if(!schemaDetails){
+      return res
+      .status(404)
+      .json({ message: "Schema not found." });
+    }
+    res.status(200).json(schemaDetails);
+
+  }
+  catch(error) {
+    console.error(error);
+    res.status(500).json({
+      error: "An error occurred while retrieving the schema.",
+    });
+  }
+
+}
+
 
 
 export {
@@ -412,5 +454,6 @@ export {
   getAllSchemas,
   removeSchema,
   getAllCompletedSchema,
-  uploadSupplimentaryPdf
+  uploadSupplimentaryPdf,
+  getSchemadetailsById
 };
