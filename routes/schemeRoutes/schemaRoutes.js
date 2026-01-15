@@ -1,7 +1,7 @@
 import express from "express";
 const router = express.Router();
 
-import { createSchema, updateSchema, getSchemaById, getAllSchemas, removeSchema, getAllCompletedSchema, uploadSupplimentaryPdf } from "../../controllers/schemeControllers/schemaControllers.js";
+import { createSchema, updateSchema, getAllSchemas,getSchemaById, removeSchema, getAllCompletedSchema, getSchemadetailsById, uploadSupplimentaryPdf } from "../../controllers/schemeControllers/schemaControllers.js";
 import authMiddleware from "../../Middlewares/authMiddleware.js";
 
 
@@ -20,6 +20,8 @@ router.get("/getall/completed/schema", authMiddleware, getAllCompletedSchema);
 
 
 
+router.get("/getschemadetailsbyid/:id", getSchemadetailsById);
 router.post("/uploadSupplimentarypdf/:schemaId", authMiddleware, uploadSupplimentaryPdfMiddleware, uploadSupplimentaryPdf);
+
 
 export default router;
