@@ -64,6 +64,9 @@ export default function handleTimerSocket(io) {
         const minTime = schemaDetails.minTime; // in seconds
         const maxTime = schemaDetails.maxTime; // in seconds
 
+        const minMarks = schemaDetails.minMarks; // in marks
+        const maxMarks = schemaDetails.maxMarks; // in marks
+
         // Check if timer exists in Redis
         const existingTimer = await redisClient.get(timerKey);
         console.log("existingTimer", existingTimer);
@@ -112,6 +115,8 @@ export default function handleTimerSocket(io) {
           remainingTime: timer.remainingTime,
           minTime: minTime,
           maxTime: maxTime,
+          minMarks: minMarks,
+          maxMarks: maxMarks,
           
           totalTime: timer.totalTime,
         });

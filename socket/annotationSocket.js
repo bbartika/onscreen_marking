@@ -369,7 +369,7 @@ export default function handleAnnotationSocket(io) {
           annotationIds,
           questionName,
           allottedMarks,
-          parentQuestionId
+          parentQuestionId,
         } = data;
 
         console.log("data", data);
@@ -498,7 +498,8 @@ export default function handleAnnotationSocket(io) {
           console.log("parentIndex", parentIndex);
 
           if (parentIndex !== -1) {
-            const existingMarks = questionMarksData.marks[parentIndex].allottedMarks || 0;
+            const existingMarks =
+              questionMarksData.marks[parentIndex].allottedMarks || 0;
             console.log("existingMarks for parent", existingMarks);
 
             const newMarks = data.allottedMarks || 0;
@@ -513,7 +514,6 @@ export default function handleAnnotationSocket(io) {
               isMarked: true,
               updatedAt: new Date().toISOString(),
             };
-            
           }
 
           saveMarksData(userId, answerPdfId, questionMarksData);
@@ -522,10 +522,6 @@ export default function handleAnnotationSocket(io) {
             questionMarksData.marks[parentIndex]
           );
         }
-
-        
-
-        
 
         console.log("DELETE INPUT VALIDATION CHECK:", {
           userId,
@@ -779,7 +775,8 @@ export default function handleAnnotationSocket(io) {
           console.log("parentIndex", parentIndex);
 
           if (parentIndex !== -1) {
-            const existingMarks = questionMarksData.marks[parentIndex].allottedMarks || 0;
+            const existingMarks =
+              questionMarksData.marks[parentIndex].allottedMarks || 0;
             console.log("existingMarks for parent", existingMarks);
 
             const newMarks = marksObject.allottedMarks || 0;
@@ -794,19 +791,14 @@ export default function handleAnnotationSocket(io) {
               isMarked: true,
               updatedAt: new Date().toISOString(),
             };
-            
+
+            saveMarksData(userId, answerPdfId, questionMarksData);
+            console.log(
+              "questionMarksData after processing:",
+              questionMarksData.marks[parentIndex]
+            );
           }
-
-          saveMarksData(userId, answerPdfId, questionMarksData);
-          console.log(
-            "questionMarksData after processing:",
-            questionMarksData.marks[parentIndex]
-          );
         }
-
-        
-
-        
 
         const roomName = `task_${taskId}`;
         io.to(roomName).emit("marks-updated", {
