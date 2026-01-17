@@ -23,7 +23,7 @@ router.get("/getall/completed/schema", authMiddleware, getAllCompletedSchema);
 router.get("/getschemadetailsbyid/:id", getSchemadetailsById);
 router.post("/uploadSupplimentarypdf/:schemaId", authMiddleware, uploadSupplimentaryPdfMiddleware, uploadSupplimentaryPdf);
 
-router.get("/getcoordinates/:schemaId", getcoordinateSupplimentarypdf);
+router.post("/getcoordinates/:schemaId", getcoordinateSupplimentarypdf);
 
 
 export default router;

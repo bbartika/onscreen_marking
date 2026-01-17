@@ -439,38 +439,87 @@ const getSchemadetailsById = async (req, res) => {
 
 const getcoordinateSupplimentarypdf = async (req, res) => {
   const { id } = req.params;
-  const { pagenumber, coordination } = req.body;
+  const { coordination } = req.body;
 
   try {
-    const schemaDetails = await Schema.findByIdAndUpdate(
-      id, // ✅ which document to update
-      {
-        $set: {
-          hiddensupplimentarypage: pagenumber,
-          supplimentarypdfcoordinates: coordination,
-        },
-      },
-      { new: true } // ✅ return updated document
-    );
-
-    if (!schemaDetails) {
-      return res.status(404).json({
-        error: "Schema not found",
+    if (!coordination || !coordination.type || !coordination.areas) {
+      return res.status(400).json({
+        message: "coordination.type and coordination.areas are required"
       });
     }
 
+    const updates = [];
+
+    /* =========================
+       WHOLE PAGE
+    ========================= */
+    if (coordination.type === "WHOLE_PAGE") {
+      if (!Array.isArray(coordination.areas)) {
+        return res.status(400).json({
+          message: "areas must be an array of page numbers"
+        });
+      }
+
+      coordination.areas.forEach(pageNumber => {
+        updates.push({
+          pageNumber,
+          type: "WHOLE_PAGE",
+          coordinates: []
+        });
+      });
+    }
+
+    /* =========================
+       PARTIAL PAGE
+    ========================= */
+    if (coordination.type === "PARTIAL_PAGE") {
+      Object.entries(coordination.areas).forEach(([page, coords]) => {
+        updates.push({
+          pageNumber: Number(page),
+          type: "PARTIAL_PAGE",
+          coordinates: coords
+        });
+      });
+    }
+
+    /* =========================
+       UPSERT LOGIC
+    ========================= */
+    for (const page of updates) {
+      await Schema.updateOne(
+        { _id: id, "supplementaryPages.pageNumber": page.pageNumber },
+        {
+          $set: {
+            "supplementaryPages.$.type": page.type,
+            "supplementaryPages.$.coordinates": page.coordinates
+          }
+        }
+      ).then(async result => {
+        if (result.matchedCount === 0) {
+          await Schema.findByIdAndUpdate(id, {
+            $push: { supplementaryPages: page }
+          });
+        }
+      });
+    }
+
+    const updatedSchema = await Schema.findById(id);
+
     res.status(200).json({
-      message: "Supplimentary PDF coordinates updated successfully",
-      data: schemaDetails,
+      message: "Supplementary coordination saved successfully",
+      data: updatedSchema
     });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({
-      error:
-        "An error occurred while updating the supplimentary pdf coordinates.",
+      message: "Failed to save supplementary coordination"
     });
   }
 };
+
+
+
 
 export {
   createSchema,

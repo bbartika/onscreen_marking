@@ -75,14 +75,32 @@ const schemaSchema = new mongoose.Schema({
         enum: ["pending", "processing", "completed", "failed"],
         default: "pending"
     },
-    hiddensupplimentarypage:{
-        type: Number,
-        default: 0
+    supplementaryPages: [
+  {
+    pageNumber: {
+      type: Number,
+      required: true
     },
-    supplimentarypdfcoordinates:{
-        type: Object,
-        default: {}
+
+    type: {
+      type: String,
+      enum: ["WHOLE_PAGE", "PARTIAL_PAGE"],
+      required: true
     },
+
+    coordinates: {
+      type: [
+        {
+          x: Number,
+          y: Number,
+          width: Number,
+          height: Number
+        }
+      ],
+      default: []
+    }
+  }
+],
     isActive: {
         type: Boolean,
         default: true,
