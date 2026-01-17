@@ -8,6 +8,7 @@ import UserLoginLog from "../../models/authModels/UserLoginLog.js";
 
 import crypto from "crypto";
 import redisClient from "../../services/redisClient.js";
+import convertJSONToCSV from "../../services/jsonToCsv.js";
 import sendEmail from "../../utils/sendEmail.js";
 import { saveOtp, getOtp, deleteOtp } from "../../utils/otpStore.js";
 import mongoose from "mongoose";
@@ -171,109 +172,117 @@ const createUser = async (req, res) => {
 // };
 
 const userLogin = async (req, res) => {
-  
-    const { email, password, type } = req.body;
 
-    if (!email) {
-        return res.status(400).json({ message: "Email is required" });
+  const { email, password, type } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  if (!password) {
+    return res.status(400).json({ message: "Password is required" });
+  }
+
+  try {
+    if (password && type === 'password') {
+      const user = await User.findOne({ email });
+
+      if (!user) {
+        return res.status(401).json({ message: "User not found. Please sign up first." });
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      // Check if auto-logout is enabled for this login 
+      const enableAutoLogout = req.body.enableAutoLogout === true || req.body.enableAutoLogout === "true";
+      const tokenExpiry = enableAutoLogout ? "5m" : "72h";
+
+      // 🔐 create unique session id (per device login)
+      const sessionId = crypto.randomUUID();
+
+      const token = jwt.sign(
+        { userId: user._id, email: user.email, role: user.role, sessionId },
+        process.env.JWT_SECRET,
+        { expiresIn: tokenExpiry }
+      );
+
+      //Tracking User Login Logs
+      await UserLoginLog.create({
+        userId: user._id,
+        sessionId,
+        loginAt: new Date(),
+        ip: req.ip,
+        userAgent: req.headers["user-agent"]
+      });
+
+      await redisClient.set(`user:session:${user._id}`, sessionId);
+
+      const response = {
+        message: "Login successful",
+        token: token,
+        userId: user._id,
+        autoLogoutEnabled: enableAutoLogout
+      };
+
+      if (enableAutoLogout) {
+        // Create session in Redis with 5 minute expiry
+        await redisClient.setEx(`session:${user._id}`, 300, JSON.stringify({
+          userId: user._id,
+          lastActivity: Date.now()
+        }));
+      }
+
+      // 🔥 MARK USER ONLINE
+      await redisClient.setEx(`online:user:${user._id}`, 600, JSON.stringify({
+        userId: user._id,
+        lastSeen: Date.now()
+        })
+      );
+      await redisClient.sAdd("online:users", String(user._id));
+
+      res.status(200).json(response);
+    } else if (type === 'otp') {
+      const user = await User.findOne({ email });
+
+      if (!user) {
+        return res
+          .status(404)
+          .json({ message: "User not found. Please sign up first." });
+      }
+
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      await sendOtpEmail(email, otpCode);
+
+      await Otp.create({
+        user: user._id,
+        otp: otpCode,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+        otpAttempts: 0
+      });
+
+      // 🔥 MARK USER ONLINE
+      await redisClient.setEx(`online:user:${user._id}`, 600, JSON.stringify({
+          userId: user._id,
+          lastSeen: Date.now()
+        })
+      );
+      await redisClient.sAdd("online:users", String(user._id));
+
+      res
+        .status(200)
+        .json({ message: "OTP sent to your email.", userId: user._id });
     }
-
-    if (!password) {
-        return res.status(400).json({ message: "Password is required" });
-    }
-
-    try {
-        if (password && type === 'password') {
-            const user = await User.findOne({ email });
-
-            if (!user) {
-                return res.status(401).json({ message: "User not found. Please sign up first." });
-            }
-
-            const isPasswordValid = await bcrypt.compare(password, user.password);
-
-            if (!isPasswordValid) {
-                return res.status(401).json({ message: "Invalid email or password" });
-            }
-
-            // Check if auto-logout is enabled for this login 
-            const enableAutoLogout = req.body.enableAutoLogout === true || req.body.enableAutoLogout === "true";
-            const tokenExpiry = enableAutoLogout ? "5m" : "72h";
-
-            // 🔐 create unique session id (per device login)
-            const sessionId = crypto.randomUUID();
-            
-            const token = jwt.sign(
-                { userId: user._id, email: user.email, role: user.role, sessionId },
-                process.env.JWT_SECRET,
-                { expiresIn: tokenExpiry }
-            );
-
-            //Tracking User Login Logs
-            await UserLoginLog.create({
-              userId: user._id,
-              sessionId,
-              loginAt: new Date(),
-              ip: req.ip,
-              userAgent: req.headers["user-agent"]
-            });
-
-            await redisClient.set(`user:session:${user._id}`, sessionId);
-
-            const response = { 
-                message: "Login successful", 
-                token: token, 
-                userId: user._id,
-                autoLogoutEnabled: enableAutoLogout
-            };
-
-            if (enableAutoLogout) {
-                // Create session in Redis with 5 minute expiry
-                await redisClient.setEx(`session:${user._id}`, 300, JSON.stringify({
-                    userId: user._id,
-                    lastActivity: Date.now()
-                }));
-            }
-
-            // 🔥 MARK USER ONLINE
-            await redisClient.setEx(`online:user:${user._id}`, 300, "1");
-            await redisClient.sAdd("online:users", String(user._id));
-
-            res.status(200).json(response);
-        } else if (type === 'otp') {
-            const user = await User.findOne({ email });
-
-            if (!user) {
-                return res
-                .status(404)
-                .json({ message: "User not found. Please sign up first." });
-            }
-
-            const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-            await sendOtpEmail(email, otpCode);
-
-            await Otp.create({
-                user: user._id,
-                otp: otpCode,
-                expiresAt: Date.now() + 10 * 60 * 1000,
-                otpAttempts: 0
-            });
-
-            // 🔥 MARK USER ONLINE
-            await redisClient.setEx(`online:user:${user._id}`, 300, "1");
-            await redisClient.sAdd("online:users", String(user._id));
-
-            res
-            .status(200)
-            .json({ message: "OTP sent to your email.", userId: user._id });
-        }
-    } catch (error) {
-        console.error("Error during login:", error);
-        res
-        .status(500)
-        .json({ message: "Internal server error", error: error.message });
-    }
+  } catch (error) {
+    console.error("Error during login:", error);
+    res
+      .status(500)
+      .json({ message: "Internal server error", error: error.message });
+  }
 };
 
 
@@ -728,50 +737,50 @@ const passwordReset = async (req, res) => {
 /* -------------------------------------------------------------------------- */
 
 const checkIdleTimeout = async (req, res, next) => {
-    const token = req?.headers?.authorization?.split(" ")[1];
-    
-    if (!token) {
-        return res.status(401).json({ message: "No token provided" });
+  const token = req?.headers?.authorization?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId;
+
+    // Check if session exists in Redis
+    const session = await redisClient.get(`session:${userId}`);
+
+    if (!session) {
+      return res.status(401).json({
+        message: "Session expired due to 5 minute inactivity",
+        autoLogout: true
+      });
     }
 
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userId = decoded.userId;
-        
-        // Check if session exists in Redis
-        const session = await redisClient.get(`session:${userId}`);
-        
-        if (!session) {
-            return res.status(401).json({ 
-                message: "Session expired due to 5 minute inactivity",
-                autoLogout: true 
-            });
-        }
-
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        // Update session activity - extend for another 5 minutes
-        // // 300 seconds = 5 minutes
-        await redisClient.setEx(`session:${userId}`, 300, JSON.stringify({
-            userId: userId,
-            lastActivity: Date.now()
-        }));
-
-        req.user = user;
-        next();
-    } catch (error) {
-        return res.status(401).json({ 
-            message: "Invalid token", 
-            autoLogout: true 
-        });
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
+
+    // Update session activity - extend for another 5 minutes
+    // // 300 seconds = 5 minutes
+    await redisClient.setEx(`session:${userId}`, 300, JSON.stringify({
+      userId: userId,
+      lastActivity: Date.now()
+    }));
+
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      message: "Invalid token",
+      autoLogout: true
+    });
+  }
 };
 
 /* -------------------------------------------------------------------------- */
-/*                           REMOVE OFFLINE USERS                           */
+/*                           REMOVE OFFLINE USERS                             */
 /* -------------------------------------------------------------------------- */
 
 const getOnlineUsers = async (req, res) => {
@@ -781,9 +790,9 @@ const getOnlineUsers = async (req, res) => {
     const onlineUsers = [];
 
     for (const userId of userIds) {
-      const isAlive = await redisClient.exists(`online:user:${userId}`);
+      const isAlive = await redisClient.ttl(`online:user:${userId}`);
 
-      if (isAlive) {
+      if (isAlive > 0) {
         const user = await User.findById(userId).select("_id name email role");
         if (user) {
           onlineUsers.push({
@@ -791,9 +800,9 @@ const getOnlineUsers = async (req, res) => {
             status: "online"
           });
         }
-      }else {
-  await redisClient.sRem("online:users", userId);
-}
+      } else {
+        await redisClient.sRem("online:users", userId);
+      }
     }
 
     res.status(200).json({
@@ -805,10 +814,106 @@ const getOnlineUsers = async (req, res) => {
   }
 };
 
+/* -------------------------------------------------------------------------- */
+/*                           USER LOGIN LOGS TO CSV                            /
+/* -------------------------------------------------------------------------- */
+
+const downloadUserLogsCsv = async (req, res) => {
+  try {
+    const logs = await UserLoginLog.find()
+      .populate("userId", "name email role")
+      .sort({ loginAt: -1 })
+      .lean();
+
+    if (!logs || logs.length === 0) {
+      return res.status(404).json({ message: "No logs found" });
+    }
+
+    const formatToIST = (date) => {
+      if (!date) return "";
+      return new Date(date).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true
+      });
+    };
+
+    const formattedLogs = logs.map(log => ({
+      Name: log.userId?.name || "",
+      Email: log.userId?.email || "",
+      Role: log.userId?.role || "",
+      SessionId: log.sessionId,
+      LoginAt: formatToIST(log.loginAt),
+      LogoutAt: formatToIST(log.logoutAt),
+      LogoutReason: log.logoutReason || "",
+      IP: log.ip || "",
+      UserAgent: log.userAgent || ""
+    }));
+
+    const csv = convertJSONToCSV(formattedLogs);
+
+    if (!csv) {
+      return res.status(500).json({ message: "CSV conversion failed" });
+    }
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="user-login-logs.csv"'
+    );
+
+    res.status(200).send(csv);
+  } catch (error) {
+    console.error("Download CSV Error:", error);
+    res.status(500).json({ message: "Failed to download user logs" });
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/*                           USER LOGOUT                             */
+/* -------------------------------------------------------------------------- */
+
+const userLogout = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const sessionId = req.user.sessionId;
+
+    // Mark logout in DB
+    await UserLoginLog.findOneAndUpdate(
+      {
+        userId,
+        sessionId,
+        logoutAt: null
+      },
+      {
+        logoutAt: new Date(),
+        logoutReason: "Manual logout"
+      }
+    );
+
+    // Remove redis session (single-device)
+    await redisClient.del(`user:session:${userId}`);
+
+    // Remove online status
+    await redisClient.del(`online:user:${userId}`);
+    await redisClient.sRem("online:users", String(userId));
+
+    res.status(200).json({ message: "Logged out successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Logout failed" });
+  }
+};
+
 
 export {
   createUser,
   userLogin,
+  userLogout,
   // verifyOtp,
   // forgotPassword,
   removeUser,
@@ -820,5 +925,6 @@ export {
   otpVerify,
   passwordReset,
   createUsersByCsvFile,
-  checkIdleTimeout
+  checkIdleTimeout,
+  downloadUserLogsCsv
 };

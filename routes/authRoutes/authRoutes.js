@@ -5,10 +5,12 @@ import authMiddleware from "../../Middlewares/authMiddleware.js";
 import {
     createUser,
     userLogin,
+    userLogout,
     // verifyOtp,
     // forgotPassword,
     removeUser,
-    getOnlineUsers,
+    getOnlineUsers,    
+    downloadUserLogsCsv,
     getUserById,
     getAllUsers,
     updateUserDetails,
@@ -21,8 +23,10 @@ import {
 
 router.post('/signup', authMiddleware, createUser);
 router.post('/signin', userLogin);
+router.post("/logout", authMiddleware, userLogout);
 // router.post('/verify', verifyOtp);
 router.post('/createuserbycsv', authMiddleware, createUsersByCsvFile);
+router.get("/user-logs/download", authMiddleware, downloadUserLogsCsv);
 router.get("/online/users", authMiddleware, getOnlineUsers);
 router.post('/send-otp',  otpSend);
 router.post('/verify-otp', otpVerify);

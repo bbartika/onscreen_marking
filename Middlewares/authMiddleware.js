@@ -25,6 +25,7 @@
 import User from "../models/authModels/User.js";
 import jwt from "jsonwebtoken"
 import redisClient from "../services/redisClient.js";
+import UserLoginLog from "../models/authModels/UserLoginLog.js";
 
 /* -------------------------------------------------------------------------- */
 /*                           AUTH MIDDLEWARE                                  */
@@ -104,11 +105,12 @@ const authMiddleware = async (req, res, next) => {
         }
         
         req.user = user;
+        req.user.sessionId = decoded.sessionId;
 
         // 🔁 Refresh online heartbeat
         await redisClient.setEx(
           `online:user:${user._id}`,
-          300, // extend online status
+          600, // extend online status
           "1"
         );
 
