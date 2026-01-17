@@ -19,7 +19,7 @@ const createSchema = async (req, res) => {
     numberOfPage,
     hiddenPage,
     numberOfSupplement,
-    PageofSupplement
+    PageofSupplement,
   } = req.body;
 
   try {
@@ -88,7 +88,7 @@ const createSchema = async (req, res) => {
       isActive,
       status: false,
       numberOfSupplement,
-      PageofSupplement
+      PageofSupplement,
     });
 
     const savedSchema = await newSchema.save();
@@ -120,7 +120,7 @@ const updateSchema = async (req, res) => {
     numberOfPage,
     hiddenPage,
     numberOfSupplement,
-    PageofSupplement
+    PageofSupplement,
   } = req.body;
 
   console.log("Update schema called with:", {
@@ -136,7 +136,7 @@ const updateSchema = async (req, res) => {
     numberOfPage,
     hiddenPage,
     numberOfSupplement,
-    PageofSupplement
+    PageofSupplement,
   });
 
   try {
@@ -206,25 +206,27 @@ const updateSchema = async (req, res) => {
     });
 
     parentQuestions.sort(
-  (a, b) => Number(a.questionsName) - Number(b.questionsName)
-);
+      (a, b) => Number(a.questionsName) - Number(b.questionsName)
+    );
 
-const existingParentCount = parentQuestions.length;
-const newTotal = Number(totalQuestions);
+    const existingParentCount = parentQuestions.length;
+    const newTotal = Number(totalQuestions);
 
-if (existingParentCount > newTotal) {
-  const parentsToDelete = parentQuestions.slice(newTotal);
+    if (existingParentCount > newTotal) {
+      const parentsToDelete = parentQuestions.slice(newTotal);
 
-  const parentIds = parentsToDelete.map(q => q._id);
+      const parentIds = parentsToDelete.map((q) => q._id);
 
-  await QuestionDefinition.deleteMany({
-    $or: [
-      { _id: { $in: parentIds } },
-      { parentQuestionId: { $in: parentIds } }
-    ]
-  });
-  console.log(`Deleted ${parentsToDelete.length} parent questions and their sub-questions.`);
-}
+      await QuestionDefinition.deleteMany({
+        $or: [
+          { _id: { $in: parentIds } },
+          { parentQuestionId: { $in: parentIds } },
+        ],
+      });
+      console.log(
+        `Deleted ${parentsToDelete.length} parent questions and their sub-questions.`
+      );
+    }
 
     schema.name = name;
     schema.totalQuestions = totalQuestions;
@@ -363,24 +365,21 @@ const uploadSupplimentaryPdf = async (req, res) => {
     /* ================================
        MOVE PDF
     ================================= */
-    const finalPdfPath = path.join(
-      supplimentaryPdfDir,
-      `${schemaId}.pdf`
-    );
+    const finalPdfPath = path.join(supplimentaryPdfDir, `${schemaId}.pdf`);
 
     await fs.promises.rename(file.path, finalPdfPath);
 
     /* ================================
        UPDATE SCHEMA (processing)
     ================================= */
-    
+
     schema.supplimentaryPdfPath = `supplimentary-pdf/${schemaId}.pdf`;
     schema.supplimentaryProcessingStatus = "processing";
     await schema.save();
 
     res.status(200).json({
       message: "Supplimentary PDF uploaded. Image extraction started.",
-      schemaId
+      schemaId,
     });
 
     /* ================================
@@ -395,29 +394,27 @@ const uploadSupplimentaryPdf = async (req, res) => {
 
         await Schema.findByIdAndUpdate(schemaId, {
           supplimentaryImageCount: images.length,
-          supplimentaryProcessingStatus: "completed"
+          supplimentaryProcessingStatus: "completed",
         });
       } catch (err) {
         await Schema.findByIdAndUpdate(schemaId, {
           supplimentaryProcessingStatus: "failed",
-          supplimentaryErrorMessage: err.message
+          supplimentaryErrorMessage: err.message,
         });
       }
     });
-
   } catch (error) {
     console.error("Supplimentary PDF upload error:", error);
     res.status(500).json({
-      message: "Failed to upload supplimentary PDF"
+      message: "Failed to upload supplimentary PDF",
     });
   }
 };
 
 const getSchemadetailsById = async (req, res) => {
-  const {id } = req.params;
+  const { id } = req.params;
 
-  try{
-
+  try {
     // if (!isValidObjectId(id)) {
     //   return res
     //     .status(400)
@@ -428,22 +425,99 @@ const getSchemadetailsById = async (req, res) => {
       _id: id,
     });
 
-    if(!schemaDetails){
-      return res
-      .status(404)
-      .json({ message: "Schema not found." });
+    if (!schemaDetails) {
+      return res.status(404).json({ message: "Schema not found." });
     }
     res.status(200).json(schemaDetails);
-
-  }
-  catch(error) {
+  } catch (error) {
     console.error(error);
     res.status(500).json({
       error: "An error occurred while retrieving the schema.",
     });
   }
+};
 
-}
+const getcoordinateSupplimentarypdf = async (req, res) => {
+  const { id } = req.params;
+  const { coordination } = req.body;
+
+  try {
+    if (!coordination || !coordination.type || !coordination.areas) {
+      return res.status(400).json({
+        message: "coordination.type and coordination.areas are required"
+      });
+    }
+
+    const updates = [];
+
+    /* =========================
+       WHOLE PAGE
+    ========================= */
+    if (coordination.type === "WHOLE_PAGE") {
+      if (!Array.isArray(coordination.areas)) {
+        return res.status(400).json({
+          message: "areas must be an array of page numbers"
+        });
+      }
+
+      coordination.areas.forEach(pageNumber => {
+        updates.push({
+          pageNumber,
+          type: "WHOLE_PAGE",
+          coordinates: []
+        });
+      });
+    }
+
+    /* =========================
+       PARTIAL PAGE
+    ========================= */
+    if (coordination.type === "PARTIAL_PAGE") {
+      Object.entries(coordination.areas).forEach(([page, coords]) => {
+        updates.push({
+          pageNumber: Number(page),
+          type: "PARTIAL_PAGE",
+          coordinates: coords
+        });
+      });
+    }
+
+    /* =========================
+       UPSERT LOGIC
+    ========================= */
+    for (const page of updates) {
+      await Schema.updateOne(
+        { _id: id, "supplementaryPages.pageNumber": page.pageNumber },
+        {
+          $set: {
+            "supplementaryPages.$.type": page.type,
+            "supplementaryPages.$.coordinates": page.coordinates
+          }
+        }
+      ).then(async result => {
+        if (result.matchedCount === 0) {
+          await Schema.findByIdAndUpdate(id, {
+            $push: { supplementaryPages: page }
+          });
+        }
+      });
+    }
+
+    const updatedSchema = await Schema.findById(id);
+
+    res.status(200).json({
+      message: "Supplementary coordination saved successfully",
+      data: updatedSchema
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Failed to save supplementary coordination"
+    });
+  }
+};
+
 
 
 
@@ -455,5 +529,6 @@ export {
   removeSchema,
   getAllCompletedSchema,
   uploadSupplimentaryPdf,
-  getSchemadetailsById
+  getSchemadetailsById,
+  getcoordinateSupplimentarypdf,
 };

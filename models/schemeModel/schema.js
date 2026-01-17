@@ -51,19 +51,56 @@ const schemaSchema = new mongoose.Schema({
         type: [String],
         required: true
     },
+    
+    PageofSupplement:{
+        type: Number,
+        required: true
+
+    },
+    numberOfSupplement:{
+        type: Number,
+        required: true
+
+    },
     supplimentaryPdfPath:{
         type: String,
         default: null
     },
-    supplimentaryImagesLength:{
+    supplimentaryImageCount:{
         type: Number,
         default: 0
     },
-    supplimenteryProcessingStatus:{
+    supplimentaryProcessingStatus:{
         type: String,
         enum: ["pending", "processing", "completed", "failed"],
         default: "pending"
     },
+    supplementaryPages: [
+  {
+    pageNumber: {
+      type: Number,
+      required: true
+    },
+
+    type: {
+      type: String,
+      enum: ["WHOLE_PAGE", "PARTIAL_PAGE"],
+      required: true
+    },
+
+    coordinates: {
+      type: [
+        {
+          x: Number,
+          y: Number,
+          width: Number,
+          height: Number
+        }
+      ],
+      default: []
+    }
+  }
+],
     isActive: {
         type: Boolean,
         default: true,
