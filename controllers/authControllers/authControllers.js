@@ -210,11 +210,27 @@ const userLogin = async (req, res) => {
         { expiresIn: tokenExpiry }
       );
 
+      // 🔒 FORCE LOGOUT ANY EXISTING ACTIVE SESSION (SERVER SIDE)
+      await UserLoginLog.updateMany(
+        {
+          userId: user._id,
+          status: 1 
+        },
+        {
+          $set: {
+            status: 0,
+            logoutAt: new Date(),
+            logoutReason: "Logged in from another device"
+          }
+        }
+      );
+
       //Tracking User Login Logs
       await UserLoginLog.create({
         userId: user._id,
         sessionId,
         loginAt: new Date(),
+        status: 1,
         ip: req.ip,
         userAgent: req.headers["user-agent"]
       });
@@ -240,7 +256,7 @@ const userLogin = async (req, res) => {
       await redisClient.setEx(`online:user:${user._id}`, 600, JSON.stringify({
         userId: user._id,
         lastSeen: Date.now()
-        })
+      })
       );
       await redisClient.sAdd("online:users", String(user._id));
 
@@ -267,9 +283,9 @@ const userLogin = async (req, res) => {
 
       // 🔥 MARK USER ONLINE
       await redisClient.setEx(`online:user:${user._id}`, 600, JSON.stringify({
-          userId: user._id,
-          lastSeen: Date.now()
-        })
+        userId: user._id,
+        lastSeen: Date.now()
+      })
       );
       await redisClient.sAdd("online:users", String(user._id));
 
@@ -439,16 +455,29 @@ const getUserById = async (req, res) => {
 
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find();
-    if (!users || users.length === 0) {
-      return res.status(200).json({ message: "No users found", users: [] });
-    }
-    res.status(200).json(users);
+    const users = await User.find().lean();
+
+    const usersWithStatus = await Promise.all(
+      users.map(async (user) => {
+        const activeLog = await UserLoginLog.findOne({
+          userId: user._id,
+          status: 1
+        }).select("_id");
+
+        return {
+          ...user,
+          status: activeLog ? 1 : 0
+        };
+      })
+    );
+
+    res.status(200).json(usersWithStatus);
   } catch (error) {
     console.error("Error fetching users:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to fetch users", error: error.message });
+    res.status(500).json({
+      message: "Failed to fetch users",
+      error: error.message
+    });
   }
 };
 
@@ -780,6 +809,45 @@ const checkIdleTimeout = async (req, res, next) => {
 };
 
 /* -------------------------------------------------------------------------- */
+/*                         LOGOUT BROWSER/TAB CLOSED USER                     */
+/* -------------------------------------------------------------------------- */
+
+const autoLogout = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(204).end();
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const userId = decoded.userId;
+    const sessionId = decoded.sessionId;
+
+    // 🔥 Update DB immediately
+    await UserLoginLog.updateMany(
+      {
+        userId,
+        sessionId,
+        status: 1
+      },
+      {
+        status: 0,
+        logoutAt: new Date(),
+        logoutReason: "Browser closed"
+      }
+    );
+
+    // Cleanup Redis
+    await redisClient.del(`online:user:${userId}`);
+    await redisClient.sRem("online:users", String(userId));
+
+    return res.status(204).end();
+  } catch (err) {
+    // Never block tab close
+    return res.status(204).end();
+  }
+};
+
+/* -------------------------------------------------------------------------- */
 /*                           REMOVE OFFLINE USERS                             */
 /* -------------------------------------------------------------------------- */
 
@@ -790,6 +858,20 @@ const getOnlineUsers = async (req, res) => {
     const onlineUsers = [];
 
     for (const userId of userIds) {
+
+      // 🔐 STEP 1: CHECK DB SOURCE OF TRUTH
+      const log = await UserLoginLog.findOne({
+        userId,
+        status: 1
+      });
+
+      // ❌ If DB says user is offline → clean Redis
+      if (!log) {
+        await redisClient.sRem("online:users", userId);
+        await redisClient.del(`online:user:${userId}`);
+        continue; // ⛔ skip this user
+      }
+
       const isAlive = await redisClient.ttl(`online:user:${userId}`);
 
       if (isAlive > 0) {
@@ -797,12 +879,27 @@ const getOnlineUsers = async (req, res) => {
         if (user) {
           onlineUsers.push({
             ...user.toObject(),
-            status: "online"
+            status: 1
           });
         }
       } else {
+        // 🔥 TTL expired → browser/tab/system closed
+        await UserLoginLog.updateMany(
+          {
+            userId,
+            status: 1
+          },
+          {
+            status: 0,
+            logoutAt: new Date(),
+            logoutReason: "Session timeout / browser closed"
+          }
+        );
+      
+        // 2️⃣ Cleanup Redis
         await redisClient.sRem("online:users", userId);
-      }
+        await redisClient.del(`online:user:${userId}`);
+      }     
     }
 
     res.status(200).json({
@@ -892,7 +989,8 @@ const userLogout = async (req, res) => {
       },
       {
         logoutAt: new Date(),
-        logoutReason: "Manual logout"
+        logoutReason: "Manual logout",
+        status: 0
       }
     );
 
@@ -914,6 +1012,7 @@ export {
   createUser,
   userLogin,
   userLogout,
+  autoLogout,
   // verifyOtp,
   // forgotPassword,
   removeUser,

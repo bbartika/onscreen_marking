@@ -6,6 +6,7 @@ import {
     createUser,
     userLogin,
     userLogout,
+    autoLogout,
     // verifyOtp,
     // forgotPassword,
     removeUser,
@@ -24,6 +25,7 @@ import {
 router.post('/signup', authMiddleware, createUser);
 router.post('/signin', userLogin);
 router.post("/logout", authMiddleware, userLogout);
+router.post("/auto-logout", autoLogout);
 // router.post('/verify', verifyOtp);
 router.post('/createuserbycsv', authMiddleware, createUsersByCsvFile);
 router.get("/user-logs/download", authMiddleware, downloadUserLogsCsv);

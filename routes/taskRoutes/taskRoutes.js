@@ -3,6 +3,9 @@ const router = express.Router();
 
 import {
     assigningTask,
+    reassignPendingBooklets,
+    reassignBooklets,
+    getUserCurrentTaskStatus,
    
     
     removeAssignedTask,
@@ -26,6 +29,9 @@ import authMiddleware from "../../Middlewares/authMiddleware.js";
 
 router.post("/create/task", assigningTask);
 router.post("/autoassign/task", autoAssigning);
+router.post("/reassign/pending-booklets", reassignPendingBooklets);
+router.get("/user/task-status/:userId", getUserCurrentTaskStatus);
+router.post("/reassign/booklets", reassignBooklets);    
 // router.get("/pause/task/:id", pauseTask);
 // router.put("/update/task/:id", updateAssignedTask);
 router.put("/update/task/currentIndex/:id", updateCurrentIndex);
