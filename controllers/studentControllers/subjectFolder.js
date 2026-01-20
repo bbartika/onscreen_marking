@@ -138,7 +138,7 @@ const subjectFolderWatcher = () => {
         }
       }
 ]);
-      console.log("foldersWithClassInfo", foldersWithClassInfo);
+      // console.log("foldersWithClassInfo", foldersWithClassInfo);
 
       socket.emit("folder-list", foldersWithClassInfo);
     } catch (error) {

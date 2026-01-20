@@ -11,7 +11,7 @@ const studentAnswerPdf = new mongoose.Schema({
         required: true
     },
     status: {
-        type: Boolean,
+        type: String,
         default: false
     },
     assignedDate: {

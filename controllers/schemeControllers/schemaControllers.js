@@ -1,6 +1,8 @@
 import Schema from "../../models/schemeModel/schema.js";
 import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchema.js";
 import extractImagesFromPdf from "../../services/extractImagesFromPdf.js";
+import mongoose from "mongoose";
+
 import path from "path";
 import fs from "fs";
 /* -------------------------------------------------------------------------- */
@@ -437,9 +439,87 @@ const getSchemadetailsById = async (req, res) => {
   }
 };
 
+// const getcoordinateSupplimentarypdf = async (req, res) => {
+//   const { id } = req.params;
+//   const { coordination } = req.body;
+
+//   try {
+//     if (!coordination || !coordination.type || !coordination.areas) {
+//       return res.status(400).json({
+//         message: "coordination.type and coordination.areas are required"
+//       });
+//     }
+
+//     const schema = await Schema.findById(id);
+//     if (!schema) {
+//       return res.status(404).json({ message: "Schema not found" });
+//     }
+
+//     const updates = [];
+
+//     // WHOLE PAGE
+//     if (coordination.type === "WHOLE_PAGE") {
+//       if (!Array.isArray(coordination.areas)) {
+//         return res.status(400).json({
+//           message: "areas must be an array of page numbers"
+//         });
+//       }
+
+//       coordination.areas.forEach(pageNumber => {
+//         updates.push({
+//           pageNumber,
+//           type: "WHOLE_PAGE",
+//           coordinates: []
+//         });
+//       });
+//     }
+
+//     // PARTIAL PAGE
+//     if (coordination.type === "PARTIAL_PAGE") {
+//       Object.entries(coordination.areas).forEach(([page, coords]) => {
+//         updates.push({
+//           pageNumber: Number(page),
+//           type: "PARTIAL_PAGE",
+//           coordinates: coords
+//         });
+//       });
+//     }
+
+//     // 🔑 UPSERT IN MEMORY
+//     for (const page of updates) {
+//       const index = schema.supplementaryPages.findIndex(
+//         p => p.pageNumber === page.pageNumber
+//       );
+
+//       if (index !== -1) {
+//         // update
+//         schema.supplementaryPages[index].type = page.type;
+//         schema.supplementaryPages[index].coordinates = page.coordinates;
+//       } else {
+//         // insert
+//         schema.supplementaryPages.push(page);
+//       }
+//     }
+
+//     await schema.save();
+
+//     res.status(200).json({
+//       message: "Supplementary coordination saved successfully",
+//       data: schema
+//     });
+
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({
+//       message: "Failed to save supplementary coordination"
+//     });
+//   }
+// };
 const getcoordinateSupplimentarypdf = async (req, res) => {
-  const { id } = req.params;
+  const { schemaId } = req.params;
   const { coordination } = req.body;
+
+  console.log("schemaId =", schemaId);
 
   try {
     if (!coordination || !coordination.type || !coordination.areas) {
@@ -447,12 +527,19 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
         message: "coordination.type and coordination.areas are required"
       });
     }
+    const schemaidd = new mongoose.Types.ObjectId(schemaId);
+
+    const schema = await Schema.findById(schemaidd);
+     if(!schema){
+      return res.status(404).json({ message: "Schema not found" });
+     }
+
+
+    
 
     const updates = [];
 
-    /* =========================
-       WHOLE PAGE
-    ========================= */
+    // WHOLE PAGE
     if (coordination.type === "WHOLE_PAGE") {
       if (!Array.isArray(coordination.areas)) {
         return res.status(400).json({
@@ -469,9 +556,7 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
       });
     }
 
-    /* =========================
-       PARTIAL PAGE
-    ========================= */
+    // PARTIAL PAGE
     if (coordination.type === "PARTIAL_PAGE") {
       Object.entries(coordination.areas).forEach(([page, coords]) => {
         updates.push({
@@ -482,32 +567,27 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
       });
     }
 
-    /* =========================
-       UPSERT LOGIC
-    ========================= */
+    //  UPSERT IN MEMORY
     for (const page of updates) {
-      await Schema.updateOne(
-        { _id: id, "supplementaryPages.pageNumber": page.pageNumber },
-        {
-          $set: {
-            "supplementaryPages.$.type": page.type,
-            "supplementaryPages.$.coordinates": page.coordinates
-          }
-        }
-      ).then(async result => {
-        if (result.matchedCount === 0) {
-          await Schema.findByIdAndUpdate(id, {
-            $push: { supplementaryPages: page }
-          });
-        }
-      });
+      const index = schema.supplementaryPages.findIndex(
+        p => p.pageNumber === page.pageNumber
+      );
+
+      if (index !== -1) {
+        // update
+        schema.supplementaryPages[index].type = page.type;
+        schema.supplementaryPages[index].coordinates = page.coordinates;
+      } else {
+        // insert
+        schema.supplementaryPages.push(page);
+      }
     }
 
-    const updatedSchema = await Schema.findById(id);
+    await schema.save();
 
     res.status(200).json({
       message: "Supplementary coordination saved successfully",
-      data: updatedSchema
+      data: schema
     });
 
   } catch (error) {
@@ -517,7 +597,6 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
     });
   }
 };
-
 
 
 

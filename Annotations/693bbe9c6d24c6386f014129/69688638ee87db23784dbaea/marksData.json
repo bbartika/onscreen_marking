@@ -17,7 +17,7 @@
       "answerPdfId": "69688638ee87db23784dbaea",
       "timerStamps": "",
       "isMarked": true,
-      "updatedAt": "2026-01-15T06:17:01.588Z"
+      "updatedAt": "2026-01-19T08:15:01.407Z"
     },
     {
       "_id": "69688558ee87db23784dac83",
@@ -32,11 +32,11 @@
       "numberOfSubQuestions": 2,
       "compulsorySubQuestions": 1,
       "__v": 0,
-      "allottedMarks": 0,
+      "allottedMarks": 31,
       "answerPdfId": "69688638ee87db23784dbaea",
       "timerStamps": "",
       "isMarked": true,
-      "updatedAt": "2026-01-15T06:36:26.950Z"
+      "updatedAt": "2026-01-19T09:46:58.509Z"
     },
     {
       "_id": "6968855cee87db23784dacef",
@@ -55,7 +55,7 @@
       "answerPdfId": "69688638ee87db23784dbaea",
       "timerStamps": "",
       "isMarked": true,
-      "updatedAt": "2026-01-15T06:36:26.946Z"
+      "updatedAt": "2026-01-19T09:50:41.669Z"
     },
     {
       "_id": "69688560ee87db23784dad66",
@@ -74,7 +74,7 @@
       "answerPdfId": "69688638ee87db23784dbaea",
       "timerStamps": "",
       "isMarked": true,
-      "updatedAt": "2026-01-15T06:17:03.805Z"
+      "updatedAt": "2026-01-19T09:01:59.965Z"
     },
     {
       "_id": "69688564ee87db23784daded",
@@ -93,7 +93,7 @@
       "answerPdfId": "69688638ee87db23784dbaea",
       "timerStamps": "",
       "isMarked": true,
-      "updatedAt": "2026-01-15T06:36:24.284Z"
+      "updatedAt": "2026-01-19T09:51:05.230Z"
     },
     {
       "_id": "6968856bee87db23784daea4",
@@ -127,11 +127,11 @@
       "numberOfSubQuestions": 2,
       "compulsorySubQuestions": 1,
       "__v": 0,
-      "allottedMarks": 0,
+      "allottedMarks": 9,
       "answerPdfId": "69688638ee87db23784dbaea",
       "timerStamps": "",
-      "isMarked": false,
-      "updatedAt": "2026-01-15T06:16:33.850Z"
+      "isMarked": true,
+      "updatedAt": "2026-01-19T08:18:43.666Z"
     },
     {
       "_id": "69688581ee87db23784db0e2",
@@ -149,8 +149,8 @@
       "allottedMarks": 0,
       "answerPdfId": "69688638ee87db23784dbaea",
       "timerStamps": "",
-      "isMarked": false,
-      "updatedAt": "2026-01-15T06:16:33.850Z"
+      "isMarked": true,
+      "updatedAt": "2026-01-19T08:20:19.164Z"
     },
     {
       "_id": "69688582ee87db23784db0f8",
@@ -168,8 +168,8 @@
       "allottedMarks": 0,
       "answerPdfId": "69688638ee87db23784dbaea",
       "timerStamps": "",
-      "isMarked": false,
-      "updatedAt": "2026-01-15T06:16:33.851Z"
+      "isMarked": true,
+      "updatedAt": "2026-01-19T08:20:11.678Z"
     },
     {
       "_id": "696885a0ee87db23784db40d",
@@ -187,8 +187,8 @@
       "allottedMarks": 0,
       "answerPdfId": "69688638ee87db23784dbaea",
       "timerStamps": "",
-      "isMarked": false,
-      "updatedAt": "2026-01-15T06:16:33.851Z"
+      "isMarked": true,
+      "updatedAt": "2026-01-19T08:18:05.699Z"
     },
     {
       "_id": "696885a4ee87db23784db47f",
@@ -206,8 +206,8 @@
       "allottedMarks": 0,
       "answerPdfId": "69688638ee87db23784dbaea",
       "timerStamps": "",
-      "isMarked": false,
-      "updatedAt": "2026-01-15T06:16:33.851Z"
+      "isMarked": true,
+      "updatedAt": "2026-01-19T06:52:17.645Z"
     },
     {
       "_id": "696885a7ee87db23784db4e2",
@@ -225,8 +225,8 @@
       "allottedMarks": 0,
       "answerPdfId": "69688638ee87db23784dbaea",
       "timerStamps": "",
-      "isMarked": false,
-      "updatedAt": "2026-01-15T06:16:33.851Z"
+      "isMarked": true,
+      "updatedAt": "2026-01-19T08:18:09.170Z"
     },
     {
       "_id": "696885aaee87db23784db542",
@@ -267,5 +267,5 @@
       "updatedAt": "2026-01-15T06:16:33.851Z"
     }
   ],
-  "lastSaved": "2026-01-15T06:36:35.094Z"
+  "lastSaved": "2026-01-19T09:51:05.230Z"
 }

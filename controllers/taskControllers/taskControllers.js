@@ -62,7 +62,7 @@ const assigningTask = async (req, res) => {
 
     // Check if the subject code exists
     const subject = subjectDetails.find(
-      (subject) => subject.code === subjectCode
+      (subject) => subject.code === subjectCode,
     );
 
     if (!subject) {
@@ -223,7 +223,7 @@ const assigningTask = async (req, res) => {
           updatedAt: new Date(),
         },
       },
-      { session }
+      { session },
     );
 
     await session.commitTransaction();
@@ -275,7 +275,7 @@ const autoAssigning = async (req, res) => {
     const processedFolderPath = path.join(
       __dirname,
       "processedFolder",
-      subjectCode
+      subjectCode,
     );
 
     if (!fs.existsSync(processedFolderPath)) {
@@ -309,7 +309,7 @@ const autoAssigning = async (req, res) => {
     let unallocatedPdfs = (
       await SubjectFolderModel.findOne(
         { folderName: subjectCode },
-        { unAllocated: 1, _id: 0 }
+        { unAllocated: 1, _id: 0 },
       ).lean()
     )?.unAllocated;
 
@@ -463,7 +463,7 @@ const autoAssigning = async (req, res) => {
       (
         await SubjectFolderModel.findOne(
           { folderName: subjectCode },
-          { unAllocated: 1, _id: 0 }
+          { unAllocated: 1, _id: 0 },
         ).lean()
       )?.unAllocated ?? 0;
     console.log("previousUnallocated", previousUnallocated);
@@ -480,7 +480,7 @@ const autoAssigning = async (req, res) => {
       (
         await SubjectFolderModel.findOne(
           { folderName: subjectCode },
-          { allocated: 1, _id: 0 }
+          { allocated: 1, _id: 0 },
         ).lean()
       )?.allocated ?? 0;
     console.log("previouslyAllocated", previouslyAllocated);
@@ -503,14 +503,14 @@ const autoAssigning = async (req, res) => {
         },
         updatedAt: new Date(),
       },
-      { session }
+      { session },
     );
 
     await session.commitTransaction();
     session.endSession();
 
     console.log(
-      `Auto-assigned ${totalAssigned} booklets for subject ${subjectCode}.`
+      `Auto-assigned ${totalAssigned} booklets for subject ${subjectCode}.`,
     );
     res.status(200).json({
       message: `Auto-assigned ${totalAssigned} booklets for subject ${subjectCode}.`,
@@ -782,11 +782,11 @@ const getAssignTaskById = async (req, res) => {
     } else if (task.status === "active" && task.lastResumedAt) {
       // Calculate elapsed time since last resume
       const elapsedSeconds = Math.floor(
-        (new Date() - task.lastResumedAt) / 1000
+        (new Date() - task.lastResumedAt) / 1000,
       );
       remainingSeconds = Math.max(
         (task.remainingTimeInSec ?? maxTime * 60) - elapsedSeconds,
-        0
+        0,
       );
     } else {
       remainingSeconds = maxTime * 60;
@@ -801,13 +801,17 @@ const getAssignTaskById = async (req, res) => {
 
     const extractedBookletsFolder = path.join(
       subjectFolder,
-      "extractedBooklets"
+      "extractedBooklets",
     );
     if (!fs.existsSync(extractedBookletsFolder)) {
       fs.mkdirSync(extractedBookletsFolder, { recursive: true });
     }
 
     const assignedPdfs = await AnswerPdf.find({ taskId: task._id });
+    await AnswerPdf.updateMany(
+      { taskId: task._id, status: { $ne: "progress" } },
+      { $set: { status: "progress" } },
+    );
     assignedPdfs.forEach((pdf, index) => {
       console.log(`   PDF ${index + 1}: ${pdf.answerPdfName}`);
     });
@@ -840,7 +844,7 @@ const getAssignTaskById = async (req, res) => {
       answerPdfId: currentPdf._id,
     });
     console.log(
-      `🖼️ EXISTING EXTRACTED IMAGES IN DATABASE: ${extractedImages.length}`
+      `🖼️ EXISTING EXTRACTED IMAGES IN DATABASE: ${extractedImages.length}`,
     );
 
     let extractedBookletPath = `processedFolder/${
@@ -849,7 +853,7 @@ const getAssignTaskById = async (req, res) => {
 
     const currentPdfFolder = path.join(
       extractedBookletsFolder,
-      path.basename(currentPdf.answerPdfName, ".pdf")
+      path.basename(currentPdf.answerPdfName, ".pdf"),
     );
 
     // Define directory structure for completedFolder
@@ -857,7 +861,7 @@ const getAssignTaskById = async (req, res) => {
     const subjectCompletedFolder = path.join(completedFolder, task.subjectCode);
     const bookletFolder = path.join(
       subjectCompletedFolder,
-      path.basename(currentPdf.answerPdfName, ".pdf")
+      path.basename(currentPdf.answerPdfName, ".pdf"),
     );
 
     if (!fs.existsSync(completedFolder)) fs.mkdirSync(completedFolder);
@@ -899,7 +903,7 @@ const getAssignTaskById = async (req, res) => {
     if (extractedImages.length > 0) {
       // MOVE HIDDEN IMAGES TO SECURE LOCATION IMMEDIATELY AFTER EXTRACTION
       const hiddenImages = extractedImages.filter((_, index) =>
-        hiddenPages.includes(index)
+        hiddenPages.includes(index),
       );
 
       console.log("hidden images", hiddenImages);
@@ -918,7 +922,7 @@ const getAssignTaskById = async (req, res) => {
       }
 
       const visibleImages = extractedImages.filter(
-        (_, index) => !hiddenPages.includes(index)
+        (_, index) => !hiddenPages.includes(index),
       );
 
       return res.status(200).json({
@@ -948,7 +952,7 @@ const getAssignTaskById = async (req, res) => {
 
     // MOVE HIDDEN IMAGES TO SECURE LOCATION IMMEDIATELY AFTER EXTRACTION
     const hiddenImages = insertedImages.filter((_, index) =>
-      hiddenPages.includes(index)
+      hiddenPages.includes(index),
     );
 
     for (const image of hiddenImages) {
@@ -965,7 +969,7 @@ const getAssignTaskById = async (req, res) => {
     }
 
     const visibleImages = insertedImages.filter(
-      (_, index) => !hiddenPages.includes(index)
+      (_, index) => !hiddenPages.includes(index),
     );
 
     return res.status(200).json({
@@ -1124,7 +1128,7 @@ const getQuestionDefinitionTaskId = async (req, res) => {
       questionDefinitions.map(async (question) => {
         // Find the related Marks entry for the current questionDefinitionId
         const marks = marksData.find(
-          (m) => m.questionDefinitionId.toString() === question._id.toString()
+          (m) => m.questionDefinitionId.toString() === question._id.toString(),
         );
 
         // If Marks entry exists, add its data, otherwise leave as empty
@@ -1147,7 +1151,7 @@ const getQuestionDefinitionTaskId = async (req, res) => {
           ...question.toObject(),
           ...marksInfo,
         };
-      })
+      }),
     );
 
     // Send the enriched data as a response
@@ -1170,7 +1174,7 @@ const getAllTasksBasedOnSubjectCode = async (req, res) => {
 
     const tasks = await Task.find({ subjectCode: subjectcode }).populate(
       "userId",
-      "name email"
+      "name email",
     );
 
     res.status(200).json(tasks);
@@ -1358,8 +1362,8 @@ const completedBookletHandler = async (req, res) => {
       0,
       Math.min(
         100,
-        Math.round(((maxTime - effectiveTime) / (maxTime - minTime)) * 100)
-      )
+        Math.round(((maxTime - effectiveTime) / (maxTime - minTime)) * 100),
+      ),
     );
 
     // 6️⃣ PUSH efficiency into array
@@ -1371,14 +1375,14 @@ const completedBookletHandler = async (req, res) => {
       },
       {
         $push: { efficiency },
-      }
+      },
     );
 
     await User.updateOne(
       { _id: userId },
       {
         $push: { efficiency },
-      }
+      },
     );
 
     if (!answerpdfid) {
@@ -1393,7 +1397,7 @@ const completedBookletHandler = async (req, res) => {
     const folderPath = path.join(
       "Annotations",
       String(userId),
-      String(answerpdfid)
+      String(answerpdfid),
     );
 
     if (!fs.existsSync(folderPath)) {

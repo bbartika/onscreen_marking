@@ -554,10 +554,14 @@ if (!schema) throw new Error("Schema not found");
               const pdfDoc = await PDFDocument.load(pdfBytes);
               const totalPages = pdfDoc.getPageCount();
 
+              
+
               let targetFolderPath;
               let status;
 
-              if (totalPages === schema.numberOfPage) {
+              // + (schema.numberOfSupplement * schema.PageofSupplement)
+
+              if (totalPages === schema.numberOfPage ) {
                 targetFolderPath = processedFolderPath;
                 status = "Processed";
                 processedCount++;

@@ -75,7 +75,7 @@ const schemaSchema = new mongoose.Schema({
         enum: ["pending", "processing", "completed", "failed"],
         default: "pending"
     },
-    supplementaryPages: [
+   supplementaryPages: [
   {
     pageNumber: {
       type: Number,
@@ -101,6 +101,7 @@ const schemaSchema = new mongoose.Schema({
     }
   }
 ],
+
     isActive: {
         type: Boolean,
         default: true,
