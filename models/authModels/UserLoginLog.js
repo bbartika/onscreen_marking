@@ -22,6 +22,11 @@ const UserLoginLogSchema = new mongoose.Schema({
         type: String,
         default: null
     },
+    status: {
+      type: Number,
+      enum: [0, 1], // 0 = offline, 1 = online
+      default: 0
+    },
     ip: {
         type: String
     },

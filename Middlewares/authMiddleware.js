@@ -50,11 +50,12 @@ const authMiddleware = async (req, res, next) => {
                 {
                   userId: decoded.userId,
                   sessionId: decoded.sessionId,
-                  logoutAt: null
+                  status: 1
                 },
                 {
                   logoutAt: new Date(),
-                  logoutReason: "Logged in from another device"
+                  logoutReason: "Logged in from another device",
+                  status: 0
                 }
             );
 

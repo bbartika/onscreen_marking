@@ -5,6 +5,7 @@ import { io } from "../../server.js";
 import { isValidObjectId } from "../../services/mongoIdValidation.js";
 import User from "../../models/authModels/User.js";
 import SubjectSchemaRelation from "../../models/subjectSchemaRelationModel/subjectSchemaRelationModel.js";
+import BookletReassignment from "../../models/taskModels/bookletReassignmentModel.js";
 import AnswerPdf from "../../models/EvaluationModels/studentAnswerPdf.js";
 import Schema from "../../models/schemeModel/schema.js";
 
@@ -240,6 +241,369 @@ const assigningTask = async (req, res) => {
       .json({ error: "An error occurred while assigning the task." });
   }
 };
+
+const reassignPendingBooklets = async (req, res) => {
+  const {
+    fromTaskId,
+    toUserId,
+    transferCount,
+    reassignedBy,
+  } = req.body;
+
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    if (
+      !fromTaskId ||
+      !toUserId ||
+      !transferCount ||
+      transferCount <= 0
+    ) {
+      return res.status(400).json({ message: "Invalid payload" });
+    }
+
+    // 🔹 SOURCE TASK
+    const fromTask = await Task.findById(fromTaskId).session(session);
+
+    if (!fromTask) {
+      return res.status(404).json({ message: "Source task not found" });
+    }
+
+    // 🔒 RULE 1: Task must be inactive or active
+    if (!["inactive", "active"].includes(fromTask.status)) {
+      return res.status(400).json({
+        message: "Completed task booklets cannot be reassigned",
+      });
+    }
+
+    // 🔹 TARGET TASK (same subjectCode)
+    let toTask = await Task.findOne({
+      userId: toUserId,
+      subjectCode: fromTask.subjectCode,
+      status: { $ne: "completed" },
+    }).session(session);
+
+    if (!toTask) {
+      toTask = new Task({
+        subjectCode: fromTask.subjectCode,
+        userId: toUserId,
+        totalBooklets: 0,
+        status: "inactive",
+        currentFileIndex: 1,
+      });
+      await toTask.save({ session });
+    }
+
+    // 🔹 FETCH ONLY PENDING (status:false) PDFs
+    const pendingPdfs = await AnswerPdf.find({
+      taskId: fromTask._id,
+      status: false, // 🔒 RULE 2
+    })
+      .limit(Number(transferCount))
+      .session(session);
+
+    if (pendingPdfs.length < transferCount) {
+      return res.status(400).json({
+        message: "Not enough pending booklets to reassign",
+      });
+    }
+
+    const transferredPdfNames = [];
+
+    // 🔁 MOVE BOOKLETS
+    for (const pdf of pendingPdfs) {
+      pdf.taskId = toTask._id;
+      pdf.assignedDate = new Date();
+      await pdf.save({ session });
+
+      transferredPdfNames.push(pdf.answerPdfName);
+    }
+
+    // 🔢 UPDATE COUNTS
+    fromTask.totalBooklets -= pendingPdfs.length;
+    toTask.totalBooklets += pendingPdfs.length;
+
+    await fromTask.save({ session });
+    await toTask.save({ session });
+
+    // 🧾 LOG HISTORY
+    await BookletReassignment.create(
+      [
+        {
+          subjectCode: fromTask.subjectCode,
+          fromUserId: fromTask.userId,
+          toUserId,
+          fromTaskId: fromTask._id,
+          toTaskId: toTask._id,
+          transferredCount: pendingPdfs.length,
+          transferredPdfNames,
+          reassignedBy,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      success: true,
+      message: `${pendingPdfs.length} pending booklets reassigned successfully`,
+      transferredPdfNames,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    console.error("Reassignment failed:", error);
+    return res.status(500).json({
+      message: "Failed to reassign booklets",
+    });
+  }
+};
+
+const reassignBooklets = async (req, res) => {
+  const {
+    fromUserId,
+    toUserId,
+    subjectCode,
+    transferCount,
+    reassignedBy,
+  } = req.body;
+
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    if (
+      !fromUserId ||
+      !toUserId ||
+      !subjectCode ||
+      !transferCount ||
+      transferCount <= 0
+    ) {
+      return res.status(400).json({ message: "Invalid payload" });
+    }
+
+    // 🔹 Find source task
+    const fromTask = await Task.findOne({
+      userId: fromUserId,
+      subjectCode,
+      status: { $ne: "success" },
+    }).session(session);
+
+    if (!fromTask) {
+      return res.status(404).json({
+        message: "Source task not found",
+      });
+    }
+
+    // 🔹 Get uncompleted PDFs from source user
+    const sourcePdfs = await AnswerPdf.find({
+      taskId: fromTask._id,
+      status: false,
+    })
+      .limit(Number(transferCount))
+      .session(session);
+
+    if (sourcePdfs.length < transferCount) {
+      return res.status(400).json({
+        message: "Not enough pending booklets to transfer",
+      });
+    }
+
+    // 🔹 Find / create target task
+    let toTask = await Task.findOne({
+      userId: toUserId,
+      subjectCode,
+    }).session(session);
+
+    if (!toTask) {
+      toTask = new Task({
+        subjectCode,
+        userId: toUserId,
+        totalBooklets: 0,
+        status: "inactive",
+        currentFileIndex: 1,
+      });
+      await toTask.save({ session });
+    }
+
+    const transferredPdfNames = [];
+
+    // 🔹 Move PDFs
+    for (const pdf of sourcePdfs) {
+      pdf.taskId = toTask._id;
+      pdf.assignedDate = new Date();
+      await pdf.save({ session });
+
+      transferredPdfNames.push(pdf.answerPdfName);
+    }
+
+    // 🔹 Update booklet counts
+    fromTask.totalBooklets -= sourcePdfs.length;
+    toTask.totalBooklets += sourcePdfs.length;
+
+    await fromTask.save({ session });
+    await toTask.save({ session });
+
+    // 🔹 Insert reassignment log
+    await BookletReassignment.create(
+      [
+        {
+          subjectCode,
+          fromUserId,
+          toUserId,
+          fromTaskId: fromTask._id,
+          toTaskId: toTask._id,
+          transferredCount: sourcePdfs.length,
+          transferredPdfNames,
+          reassignedBy,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      success: true,
+      message: `${sourcePdfs.length} booklets reassigned successfully`,
+      transferredPdfNames,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    console.error("Reassignment error:", error);
+    return res.status(500).json({
+      message: "Failed to reassign booklets",
+    });
+  }
+};
+
+const getUserCurrentTaskStatus = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    if (!isValidObjectId(userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
+    // 🔹 Fetch user
+    const user = await User.findById(userId).select("name email maxBooklets");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // 🔹 Fetch active & inactive tasks (exclude success)
+    const tasks = await Task.find({
+      userId,
+      status: { $ne: "success" },
+    });
+
+    if (tasks.length === 0) {
+      return res.status(200).json({
+        user,
+        tasks: [],
+        message: "No active tasks found",
+      });
+    }
+
+    const responseTasks = [];
+
+    for (const task of tasks) {
+      // 🔹 Subject
+      const subject = await Subject.findOne({ code: task.subjectCode });
+
+      // 🔹 Schema relation
+      const schemaRelation = subject
+        ? await SubjectSchemaRelation.findOne({
+            subjectId: subject._id,
+          })
+        : null;
+
+      // 🔹 Booklet counts
+      const totalBooklets = task.totalBooklets;
+
+      const progressBooklets = 0; // backend flag not implemented yet
+
+      //TO BE ENABLED WHEN PROGRESS ADDED IN BOOKLET STATUS
+      // const progressBooklets = await AnswerPdf.countDocuments({
+      //   taskId: task._id,
+      //   progress: true,
+      // });
+
+      const completedBooklets = await AnswerPdf.countDocuments({
+        taskId: task._id,
+        status: true,
+      });
+
+      const pendingBooklets = await AnswerPdf.countDocuments({
+        taskId: task._id,
+        status: false,
+      });
+
+      // 🔹 Latest assignment date
+      const latestAssignment = await AnswerPdf.findOne({
+        taskId: task._id,
+      })
+        .sort({ assignedDate: -1 })
+        .select("assignedDate");
+
+      responseTasks.push({
+        taskId: task._id,
+        subjectCode: task.subjectCode,
+        subjectName: subject?.name || null,
+
+        taskStatus: task.status,
+        currentFileIndex: task.currentFileIndex,
+
+        statusBreakdown: {
+          completed: completedBooklets,   // status === true
+          progress: progressBooklets,     // always 0 for now
+          pending: pendingBooklets        // status === false
+        },         
+
+        schema: schemaRelation
+          ? {
+              schemaId: schemaRelation.schemaId,
+              questionPdfPath: schemaRelation.questionPdfPath,
+              answerPdfPath: schemaRelation.answerPdfPath,
+              countOfQuestionImages:
+                schemaRelation.countOfQuestionImages,
+              countOfAnswerImages:
+                schemaRelation.countOfAnswerImages,
+            }
+          : null,
+
+        booklets: {
+          total: totalBooklets,
+          completed: completedBooklets,
+          pending: pendingBooklets,
+        },
+
+        lastAssignedAt: latestAssignment?.assignedDate || null,
+      });
+    }
+
+    return res.status(200).json({
+      user,
+      tasks: responseTasks,
+    });
+  } catch (error) {
+    console.error("Error fetching user task status:", error);
+    return res.status(500).json({
+      message: "Failed to fetch user task status",
+    });
+  }
+};
+
 const autoAssigning = async (req, res) => {
   const { subjectCode } = req.body;
   const session = await mongoose.startSession();
@@ -1643,6 +2007,9 @@ const checkTaskCompletionHandler = async (req, res) => {
 
 export {
   assigningTask,
+  reassignPendingBooklets,
+  reassignBooklets,
+  getUserCurrentTaskStatus,
   removeAssignedTask,
   getAssignTaskById,
   getAllAssignedTaskByUserId,
