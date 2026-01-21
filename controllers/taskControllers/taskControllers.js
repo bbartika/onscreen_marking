@@ -117,7 +117,7 @@ const assigningTask = async (req, res) => {
 
     const todayPending = await AnswerPdf.countDocuments({
       taskId: { $in: taskIds },
-      status: false,
+      status: "false",
       assignedDate: { $gte: startOfDay, $lte: endOfDay },
     }).session(session);
 
@@ -176,7 +176,7 @@ const assigningTask = async (req, res) => {
     const answerPdfDocs = pdfsToBeAssigned.map((pdf) => ({
       taskId: task._id,
       answerPdfName: pdf,
-      status: false,
+      status: "false",
       assignedDate: new Date(),
     }));
 
@@ -199,13 +199,13 @@ const assigningTask = async (req, res) => {
     // 3️⃣ evaluation_pending = ALL PDFs where status:false (GLOBAL)
     const evaluation_pending = await AnswerPdf.countDocuments({
       taskId: { $in: subjectTaskIds },
-      status: false,
+      status: "false",
     }).session(session);
 
     // 4️⃣ evaluated = ALL PDFs where status:true (GLOBAL)
     const evaluated = await AnswerPdf.countDocuments({
       taskId: { $in: subjectTaskIds },
-      status: true,
+      status: "true",
     }).session(session);
 
     // 5️⃣ unAllocated = total PDFs - allocated
@@ -306,10 +306,10 @@ const reassignPendingBooklets = async (req, res) => {
     // 🔹 FETCH ONLY PENDING (status:false) PDFs
     const pendingPdfs = await AnswerPdf.find({
       taskId: fromTask._id,
-      status: "false", // 🔒 RULE 2
+      status: { $in: ["false", "progress"] },
     })
-      .limit(Number(transferCount))
-      .session(session);
+    .limit(Number(transferCount))
+    .session(session);
 
       console.log("pending pdfs", pendingPdfs.length);
 
@@ -413,7 +413,7 @@ const reassignBooklets = async (req, res) => {
     // 🔹 Get uncompleted PDFs from source user
     const sourcePdfs = await AnswerPdf.find({
       taskId: fromTask._id,
-      status: false,
+      status: "false",
     })
       .limit(Number(transferCount))
       .session(session);
@@ -550,12 +550,12 @@ const getUserCurrentTaskStatus = async (req, res) => {
 
       const completedBooklets = await AnswerPdf.countDocuments({
         taskId: task._id,
-        status: true,
+        status: "true",
       });
 
       const pendingBooklets = await AnswerPdf.countDocuments({
         taskId: task._id,
-        status: false,
+        status: "false",
       });
 
       // 🔹 Latest assignment date
@@ -748,7 +748,7 @@ const autoAssigning = async (req, res) => {
 
         const todayPending = await AnswerPdf.countDocuments({
           taskId: { $in: taskIds },
-          status: false,
+          status: "false",
           assignedDate: { $gte: startOfDay, $lte: endOfDay },
         }).session(session);
 
@@ -789,7 +789,7 @@ const autoAssigning = async (req, res) => {
         await new AnswerPdf({
           taskId: task._id,
           answerPdfName: pdfFile,
-          status: false,
+          status: "false",
           assignedDate: new Date(),
         }).save({ session });
 
@@ -816,14 +816,14 @@ const autoAssigning = async (req, res) => {
       .session(session);
 
     const evaluationPending = await AnswerPdf.countDocuments({
-      status: false,
+      status: "false",
       taskId: { $in: allTaskIds },
     }).session(session);
 
     console.log("evaluationPending", evaluationPending);
 
     const evaluated = await AnswerPdf.countDocuments({
-      status: true,
+      status: "true",
       taskId: { $in: allTaskIds },
     }).session(session);
 
@@ -1182,7 +1182,7 @@ const getAssignTaskById = async (req, res) => {
 
     const assignedPdfs = await AnswerPdf.find({ taskId: task._id });
     await AnswerPdf.updateMany(
-      { taskId: task._id, status: { $ne: "progress" } },
+      { taskId: task._id, status: "false" },
       { $set: { status: "progress" } },
     );
     assignedPdfs.forEach((pdf, index) => {
@@ -1653,7 +1653,7 @@ const getUsersFormanualAssign = async (req, res) => {
 //     // }
 
 //     // Update AnswerPdf status to 'true'
-//     await AnswerPdf.findByIdAndUpdate(currentPdf._id, { status: true });
+//     await AnswerPdf.findByIdAndUpdate(currentPdf._id, { status: "true" });
 
 //     let totalBooklets = 0;
 //     let completedBooklets = 0;
@@ -1662,7 +1662,7 @@ const getUsersFormanualAssign = async (req, res) => {
 //     for (const currentTask of tasks) {
 //       const answerPdfs = await AnswerPdf.find({
 //         taskId: currentTask._id,
-//         status: true,
+//         status: "true",
 //       });
 //       totalBooklets += currentTask.totalBooklets;
 //       completedBooklets += answerPdfs.length;
@@ -1706,27 +1706,65 @@ const completedBookletHandler = async (req, res) => {
     const { answerpdfid, userId } = req.params;
     const { submitted } = req.body;
 
-    const taskId = await AnswerPdf.findById(answerpdfid)
-      .select("taskId")
-      .lean();
+    const taskDoc = await AnswerPdf.findById(answerpdfid)
+    .select("taskId")
+    .lean();
+    
+    const taskId = taskDoc?.taskId;
 
     console.log("taskId", taskId);
 
-    const subjectCode = await Task.findById(taskId)
-      .select("subjectCode")
-      .lean();
+    const taskData = await Task.findById(taskId)
+    .select("subjectCode")
+    .lean();
+
+    const subjectCode = taskData?.subjectCode;
 
     console.log("subjectCode", subjectCode);
 
-    const subjectName = await Subject.findOne({ code: subjectCode })
-      .select("name")
+        // 1️⃣ Get subject
+    const subject = await Subject.findOne({ code: subjectCode })
+      .select("_id")
       .lean();
-
-    console.log("subjectName", subjectName);
-
-    const { minTime, maxTime } = await Schema.findOne({ name: subjectName })
+      
+    if (!subject) {
+      return res.status(404).json({
+        success: false,
+        message: "Subject not found",
+      });
+    }
+    
+    // 2️⃣ Get subject-schema relation
+    const schemaRelation = await SubjectSchemaRelation.findOne({
+      subjectId: subject._id,
+    })
+    .select("schemaId")
+    .lean();
+    
+    if (!schemaRelation) {
+      return res.status(404).json({
+        success: false,
+        message: "Schema relation not found for subject",
+      });
+    }
+    
+    // 3️⃣ Get schema timing
+    const schemaDoc = await Schema.findById(schemaRelation.schemaId)
       .select("minTime maxTime")
       .lean();
+    
+    const minTime = schemaDoc?.minTime;
+    const maxTime = schemaDoc?.maxTime;
+
+    console.log(minTime);
+    console.log(maxTime);
+    
+    if (minTime == null || maxTime == null) {
+      return res.status(400).json({
+        success: false,
+        message: "Schema timing configuration missing",
+      });
+    }
 
     console.log("minTime, maxTime", minTime, maxTime);
 
@@ -1898,7 +1936,7 @@ const completedBookletHandler = async (req, res) => {
     }
 
     const answerPdfDoc = await AnswerPdf.findByIdAndUpdate(answerpdfid, {
-      status: true,
+      status: "true",
     });
     console.log("✅ Updated AnswerPdf status to true");
 
@@ -1913,7 +1951,7 @@ const completedBookletHandler = async (req, res) => {
     for (const currentTask of tasks) {
       const answerPdfs = await AnswerPdf.find({
         taskId: currentTask._id,
-        status: true,
+        status: "true",
       });
 
       totalBooklets += currentTask.totalBooklets;
@@ -1981,7 +2019,7 @@ const checkTaskCompletionHandler = async (req, res) => {
     for (const currentTask of tasks) {
       const answerPdfs = await AnswerPdf.find({
         taskId: currentTask._id,
-        status: true,
+        status: "true",
       });
       totalBooklets += currentTask.totalBooklets;
       completedBooklets += answerPdfs.length;
@@ -1995,7 +2033,7 @@ const checkTaskCompletionHandler = async (req, res) => {
     subjectFolderDetails.evaluation_pending = totalBooklets - completedBooklets;
     await subjectFolderDetails.save();
 
-    const booklets = await AnswerPdf.find({ taskId: id, status: false });
+    const booklets = await AnswerPdf.find({ taskId: id, status: "false" });
 
     if (booklets.length === 0) {
       task.status = "success";

@@ -1,3 +1,5 @@
+// THIS IS FOR THE LINUX
+
 import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
@@ -85,6 +87,8 @@ const extractImagesFromPdf = (pdfPath, outputDir) => {
 };
 
 export default extractImagesFromPdf;
+
+//THIS IS FOR THE WINDOWS 
 
 // import fs from "fs";
 // import path from "path";
