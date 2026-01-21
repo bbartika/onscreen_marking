@@ -18,6 +18,13 @@ const studentAnswerPdf = new mongoose.Schema({
         type: Date,
         required: true,
         index: true
+    },
+    rejectionReason:{
+        type: String
+    },
+
+    rejectedAt:{
+        type: Date
     }
 });
 

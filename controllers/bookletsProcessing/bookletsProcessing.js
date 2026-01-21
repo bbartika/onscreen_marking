@@ -471,28 +471,23 @@ const processingBookletsBySocket = async (req, res) => {
   }
 
   if (activeNamespaces.has(subjectCode)) {
-  return res.status(409).json({
-    message: `Processing already in progress for ${subjectCode}`,
-  });
-}
+    return res.status(409).json({
+      message: `Processing already in progress for ${subjectCode}`,
+    });
+  }
 
-// LOCK HERE
-activeNamespaces.add(subjectCode);
-
-  
+  // LOCK HERE
+  activeNamespaces.add(subjectCode);
 
   try {
     const socketNamespace = io.of(`/processing-${subjectCode}`);
 
     if (!initializedNamespaces.has(subjectCode)) {
-  initializedNamespaces.add(subjectCode);;
+      initializedNamespaces.add(subjectCode);
 
-    // Bind only once
-    
+      // Bind only once
+
       socketNamespace.on("connection", async (socket) => {
-
-        
-        
         try {
           socket.emit("status", "Starting verification...");
 
@@ -505,26 +500,27 @@ activeNamespaces.add(subjectCode);
           if (!relation) throw new Error("Schema relation not found");
 
           const schema = await Schema.findById(relation.schemaId);
-if (!schema) throw new Error("Schema not found");
+          if (!schema) throw new Error("Schema not found");
 
           const scannedDataPath = path.join(
             __dirname,
             "scannedFolder",
-            subjectCode
+            subjectCode,
           );
           const processedFolderPath = path.join(
             __dirname,
             "processedFolder",
-            subjectCode
+            subjectCode,
           );
           const rejectedFolderPath = path.join(
             __dirname,
             "rejectedBookletsFolder",
-            subjectCode
+            subjectCode,
           );
 
           if (!fs.existsSync(scannedDataPath)) {
             throw new Error("Scanned folder not found");
+            
           }
 
           fs.mkdirSync(processedFolderPath, { recursive: true });
@@ -554,14 +550,12 @@ if (!schema) throw new Error("Schema not found");
               const pdfDoc = await PDFDocument.load(pdfBytes);
               const totalPages = pdfDoc.getPageCount();
 
-              
-
               let targetFolderPath;
               let status;
 
               // + (schema.numberOfSupplement * schema.PageofSupplement)
 
-              if (totalPages === schema.numberOfPage ) {
+              if (totalPages === schema.numberOfPage) {
                 targetFolderPath = processedFolderPath;
                 status = "Processed";
                 processedCount++;
@@ -571,10 +565,18 @@ if (!schema) throw new Error("Schema not found");
               }
 
               fs.mkdirSync(targetFolderPath, { recursive: true });
-              const targetFilePath = path.join(targetFolderPath, pdfFile);
+
+              const ext = path.extname(pdfFile);
+              const base = path.basename(pdfFile, ext);
+
+              // unique name: originalName_timestamp_random.pdf
+              const uniqueName = `${base}_${Date.now()}_${Math.floor(Math.random() * 10000)}${ext}`;
+
+              const targetFilePath = path.join(targetFolderPath, uniqueName);
+
+              fs.renameSync(pdfPath, targetFilePath);
 
               try {
-                fs.renameSync(pdfPath, targetFilePath);
               } catch (err) {
                 if (err.code === "ENOENT") {
                   console.warn(`File already moved or missing: ${pdfFile}`);
@@ -583,7 +585,7 @@ if (!schema) throw new Error("Schema not found");
                 console.error(`Failed to move file ${pdfFile}:`, err.message);
                 socket.emit(
                   "error",
-                  `Failed to move ${pdfFile}: ${err.message}`
+                  `Failed to move ${pdfFile}: ${err.message}`,
                 );
                 continue;
               }
@@ -614,13 +616,13 @@ if (!schema) throw new Error("Schema not found");
             {
               $set: { scannedFolder: totalPdfsRemaining },
               $inc: { unAllocated: processedCount },
-            }
+            },
           );
 
           const reportDir = path.join(
             __dirname,
             "processedReport",
-            subjectCode
+            subjectCode,
           );
           fs.mkdirSync(reportDir, { recursive: true });
 
@@ -636,7 +638,7 @@ if (!schema) throw new Error("Schema not found");
           } else {
             socket.emit(
               "status",
-              `${totalPdfsRemaining} PDF(s) remain in the scanned folder.`
+              `${totalPdfsRemaining} PDF(s) remain in the scanned folder.`,
             );
           }
 
@@ -654,13 +656,10 @@ if (!schema) throw new Error("Schema not found");
         }
       });
     }
-      
 
-      
-    
     res.status(200).json({
-        message: `Socket connection established for subjectCode: ${subjectCode}. Processing started.`,
-      });
+      message: `Socket connection established for subjectCode: ${subjectCode}. Processing started.`,
+    });
   } catch (error) {
     console.error("Error processing booklets:", error.message);
     activeNamespaces.delete(subjectCode); // Safety
@@ -685,7 +684,7 @@ const servingBooklets = async (req, res) => {
     __dirname,
     "scannedFolder",
     subjectCode,
-    bookletName
+    bookletName,
   );
 
   // Check if the file exists
@@ -720,7 +719,7 @@ const removeRejectedBooklets = async (req, res) => {
     const rejectedFolderPath = path.join(
       __dirname,
       "rejectedBookletsFolder",
-      subjectCode
+      subjectCode,
     );
 
     // Check if the rejected folder exists for the given subject code
@@ -848,25 +847,26 @@ const uploadingBooklets = async (req, res) => {
     ===================================================== */
     if (req.files && req.files.length > 1) {
       return res.status(400).json({
-        message: "Folder upload detected. Please upload the folder in ZIP format."
+        message:
+          "Folder upload detected. Please upload the folder in ZIP format.",
       });
     }
 
     if (!req.file) {
       return res.status(400).json({
-        message: "Please upload a PDF or a ZIP file"
+        message: "Please upload a PDF or a ZIP file",
       });
     }
 
     const subjectFolder = path.join(
       process.cwd(),
       "scannedFolder",
-      subjectCode
+      subjectCode,
     );
 
     if (!fs.existsSync(subjectFolder)) {
       return res.status(404).json({
-        message: `Subject folder ${subjectCode} not found`
+        message: `Subject folder ${subjectCode} not found`,
       });
     }
 
@@ -878,12 +878,12 @@ const uploadingBooklets = async (req, res) => {
     if (fileExt === ".pdf") {
       fs.renameSync(
         req.file.path,
-        path.join(subjectFolder, req.file.originalname)
+        path.join(subjectFolder, req.file.originalname),
       );
 
       return res.status(200).json({
         message: "Single PDF uploaded successfully",
-        subjectCode
+        subjectCode,
       });
     }
 
@@ -903,8 +903,8 @@ const uploadingBooklets = async (req, res) => {
             pdfFound = true;
             entry.pipe(
               fs.createWriteStream(
-                path.join(subjectFolder, path.basename(entry.path))
-              )
+                path.join(subjectFolder, path.basename(entry.path)),
+              ),
             );
           } else {
             entry.autodrain();
@@ -916,13 +916,13 @@ const uploadingBooklets = async (req, res) => {
 
       if (!pdfFound) {
         return res.status(400).json({
-          message: "ZIP file does not contain any PDF files"
+          message: "ZIP file does not contain any PDF files",
         });
       }
 
       return res.status(200).json({
         message: "ZIP extracted and PDFs uploaded successfully",
-        subjectCode
+        subjectCode,
       });
     }
 
@@ -932,13 +932,12 @@ const uploadingBooklets = async (req, res) => {
     fs.unlinkSync(req.file.path);
 
     return res.status(400).json({
-      message: "Only PDF or ZIP files are allowed"
+      message: "Only PDF or ZIP files are allowed",
     });
-
   } catch (error) {
     console.error("Upload error:", error);
     return res.status(500).json({
-      message: "Failed to upload files"
+      message: "Failed to upload files",
     });
   }
 };
@@ -986,12 +985,12 @@ const processingBookletsManually = async (req, res) => {
     const processedFolderPath = path.join(
       __dirname,
       "processedFolder",
-      subjectCode
+      subjectCode,
     );
     const rejectedFolderPath = path.join(
       __dirname,
       "rejectedBookletsFolder",
-      subjectCode
+      subjectCode,
     );
 
     // Step 3: Verify that the scanned folder exists
