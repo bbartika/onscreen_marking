@@ -23,6 +23,7 @@ import { subjectsWithTasks } from "../classControllers/subjectControllers.js";
 
 const assigningTask = async (req, res) => {
   const { userId, subjectCode, bookletsToAssign } = req.body;
+  console.log("userId, subjectCode, bookletsToAssign", userId, subjectCode, bookletsToAssign);
 
   const session = await mongoose.startSession();
 
@@ -136,7 +137,11 @@ const assigningTask = async (req, res) => {
       });
     }
 
+    console.log("allpdfs", allPdfs.length);
+
     const pdfsToBeAssigned = allPdfs.slice(0, bookletsToAssign);
+
+    console.log("pdfsToBeAssigned", pdfsToBeAssigned.length);
 
     if (pdfsToBeAssigned.length === 0) {
       return res.status(400).json({ message: "No PDFs found to assign." });
@@ -250,6 +255,8 @@ const reassignPendingBooklets = async (req, res) => {
     reassignedBy,
   } = req.body;
 
+  console.log("Reassignment request:", req.body);
+
   const session = await mongoose.startSession();
 
   try {
@@ -282,7 +289,7 @@ const reassignPendingBooklets = async (req, res) => {
     let toTask = await Task.findOne({
       userId: toUserId,
       subjectCode: fromTask.subjectCode,
-      status: { $ne: "completed" },
+      status: { $ne: "success" },
     }).session(session);
 
     if (!toTask) {
@@ -303,6 +310,8 @@ const reassignPendingBooklets = async (req, res) => {
     })
     .limit(Number(transferCount))
     .session(session);
+
+      console.log("pending pdfs", pendingPdfs.length);
 
     if (pendingPdfs.length < transferCount) {
       return res.status(400).json({
@@ -2044,6 +2053,28 @@ const checkTaskCompletionHandler = async (req, res) => {
   }
 };
 
+const rejectBooklet = async (req, res)=> {
+  const { answerPdfId } = req.params;
+  const {reason, rejectedAt} = req.body;
+  try{
+    if (!isValidObjectId(answerPdfId)) {
+      return res.status(400).json({ message: "Invalid answerPdfId." });
+    }
+    await AnswerPdf.findByIdAndUpdate(answerPdfId, {
+      status: "rejected",
+      rejectionReason: reason,
+      rejectedAt: rejectedAt ? new Date(rejectedAt) : new Date(),
+    });
+    return res.status(200).json({ message: "Booklet rejected successfully." });
+  }
+  catch(error){ 
+    console.error("Error rejecting booklet:", error);
+    return res
+      .status(500)
+      .json({ message: "Failed to reject booklet", error: error.message });
+  }
+}
+
 export {
   assigningTask,
   reassignPendingBooklets,
@@ -2060,4 +2091,5 @@ export {
   completedBookletHandler,
   checkTaskCompletionHandler,
   autoAssigning,
+  rejectBooklet
 };

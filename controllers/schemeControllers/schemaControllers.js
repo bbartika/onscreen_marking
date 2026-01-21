@@ -534,6 +534,14 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
       return res.status(404).json({ message: "Schema not found" });
      }
 
+     
+
+     const existingType = schema.supplementaryPages.length > 0 ? schema.supplementaryPages[0].type : null;
+
+      if (existingType && existingType !== coordination.type) {
+      // 🔥 DELETE EVERYTHING
+      schema.supplementaryPages = [];
+    }
 
     
 
@@ -567,18 +575,21 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
       });
     }
 
+    
+
     //  UPSERT IN MEMORY
     for (const page of updates) {
       const index = schema.supplementaryPages.findIndex(
         p => p.pageNumber === page.pageNumber
       );
 
-      if (index !== -1) {
-        // update
-        schema.supplementaryPages[index].type = page.type;
-        schema.supplementaryPages[index].coordinates = page.coordinates;
-      } else {
+      if (index !== -1  ) {
+        
+          schema.supplementaryPages[index].coordinates = page.coordinates;
+
+     } else {
         // insert
+
         schema.supplementaryPages.push(page);
       }
     }

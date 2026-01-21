@@ -1,0 +1,28 @@
+{
+  "marks": [
+    {
+      "id": "1/21/2026, 11:07:31 AM",
+      "taskId": "69705ff06643df459fac63b9",
+      "page": "2",
+      "answerPdfId": "696f7581190882984e3d2e94",
+      "questionDefinitionId": "696f4b9bb67f6cd599583b4f",
+      "question": 1.1,
+      "parentQuestionId": "696f4b97b67f6cd599583b38",
+      "allottedMarks": 10,
+      "timeStamps": "1/21/2026, 11:07:31 AM",
+      "synced": false
+    },
+    {
+      "id": "1/21/2026, 11:07:40 AM",
+      "taskId": "69705ff06643df459fac63b9",
+      "page": "3",
+      "answerPdfId": "696f7581190882984e3d2e94",
+      "questionDefinitionId": "696f4b9ab67f6cd599583b45",
+      "question": 1.2,
+      "parentQuestionId": "696f4b97b67f6cd599583b38",
+      "allottedMarks": 9,
+      "timeStamps": "1/21/2026, 11:07:40 AM",
+      "synced": false
+    }
+  ]
+}

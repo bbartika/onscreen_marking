@@ -17,6 +17,7 @@ import {
     completedBookletHandler,
     checkTaskCompletionHandler,
     autoAssigning,
+    rejectBooklet
     // generatePdfForCompletedBooklet
 } from "../../controllers/taskControllers/taskControllers.js";
 
@@ -40,6 +41,7 @@ router.get("/get/task/:id", getAssignTaskById);
 router.get("/get/questiondefinition", getQuestionDefinitionTaskId);
 router.get("/getall/tasks/:userId", getAllAssignedTaskByUserId);
 router.get("/subjectcode", getAllTasksBasedOnSubjectCode);
+router.post("/rejectbooklet/:answerPdfId", rejectBooklet);
 router.put("/completedbooklet/:answerpdfid/:userId", completedBookletHandler);
 
 // router.post("/completeBooklet/generatePdf/:answerPdfId", generatePdfForCompletedBooklet);
