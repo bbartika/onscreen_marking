@@ -8,6 +8,7 @@ import SubjectSchemaRelation from "../../models/subjectSchemaRelationModel/subje
 import BookletReassignment from "../../models/taskModels/bookletReassignmentModel.js";
 import AnswerPdf from "../../models/EvaluationModels/studentAnswerPdf.js";
 import Schema from "../../models/schemeModel/schema.js";
+import sharp from "sharp";
 
 import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchema.js";
 import mongoose from "mongoose";
@@ -21,16 +22,224 @@ import Icon from "../../models/EvaluationModels/iconModel.js";
 import { subjectsWithTasks } from "../classControllers/subjectControllers.js";
 // import { ConversationsMessageFile } from "sib-api-v3-sdk";
 
+const extractQuestionImages = async (
+  coordinates,
+  pageImages,
+  pageImagesFolder,
+  outputFolder
+) => {
+  if (!fs.existsSync(outputFolder)) {
+    fs.mkdirSync(outputFolder, { recursive: true });
+  }
+
+  const results = [];
+
+  // ✅ WHOLE PAGES - COPY TO OUTPUT FOLDER
+  if (Array.isArray(coordinates.wholePages)) {
+    for (const page of coordinates.wholePages) {
+      const pageImage = pageImages[page - 1]; // page is 1-based
+      
+      if (!pageImage || !pageImage.name) {
+        console.warn(`⚠️ Page ${page}: No image found in database`);
+        continue;
+      }
+
+      const sourcePath = path.join(pageImagesFolder, pageImage.name);
+      
+      // Check if source file exists
+      if (!fs.existsSync(sourcePath)) {
+        console.error(`❌ Page ${page}: Source not found at ${sourcePath}`);
+        continue;
+      }
+
+      // Create output filename
+      const outputName = `image_${page}.png`;
+      const outputPath = path.join(outputFolder, outputName);
+
+      try {
+        // Copy entire page image to output folder
+        await sharp(sourcePath)
+          .toFile(outputPath);
+
+        console.log(`✅ Copied whole page ${page} → ${outputName}`);
+
+        results.push({
+          type: "whole",
+          page,
+          image: outputName,  // ✅ Points to file in outputFolder
+          originalImage: pageImage.name
+        });
+      } catch (err) {
+        console.error(`❌ Failed to copy page ${page}:`, err.message);
+      }
+    }
+  }
+
+  // ✅ PARTIAL AREAS - EXTRACT TO OUTPUT FOLDER
+  if (coordinates.partialAreas) {
+    for (const [pageStr, areas] of Object.entries(coordinates.partialAreas)) {
+      const page = Number(pageStr);
+      const pageImage = pageImages[page - 1];
+      
+      if (!pageImage || !pageImage.name) {
+        console.warn(`⚠️ Page ${page}: No image found for partial areas`);
+        continue;
+      }
+
+      const sourcePath = path.join(pageImagesFolder, pageImage.name);
+      
+      if (!fs.existsSync(sourcePath)) {
+        console.error(`❌ Page ${page}: Source not found at ${sourcePath}`);
+        continue;
+      }
+
+      for (let i = 0; i < areas.length; i++) {
+        const { x, y, width, height } = areas[i];
+
+        // Validate coordinates
+        if (x < 0 || y < 0 || width <= 0 || height <= 0) {
+          console.warn(`⚠️ Page ${page}, area ${i + 1}: Invalid coordinates`);
+          continue;
+        }
+
+        const outputName = `image_${page}.png`;
+        const outputPath = path.join(outputFolder, outputName);
+
+        try {
+          await sharp(sourcePath)
+            .extract({
+              left: Math.round(x),
+              top: Math.round(y),
+              width: Math.round(width),
+              height: Math.round(height),
+            })
+            .toFile(outputPath);
+
+          console.log(`✅ Extracted page ${page} area ${i + 1} → ${outputName}`);
+
+          results.push({
+            type: "partial",
+            page,
+            areaIndex: i + 1,
+            image: outputName,
+            coordinates: { x, y, width, height },
+            originalImage: pageImage.name
+          });
+        } catch (err) {
+          console.error(`❌ Failed to extract page ${page} area ${i + 1}:`, err.message);
+        }
+      }
+    }
+  }
+
+  console.log(`📊 Total question images extracted: ${results.length}`);
+  return results;
+};
+
+
+//   coordinates,
+//   pageImages,
+//   pageImagesFolder,
+//   outputFolder
+// ) => {
+//   if (!fs.existsSync(outputFolder)) {
+//     fs.mkdirSync(outputFolder, { recursive: true });
+//   }
+
+//   const results = [];
+//   let imageCounter = 1; // 🔥 GLOBAL COUNTER
+
+//   // Helper to find page image safely
+//   const findPageImage = (page) =>
+//     pageImages.find(img =>
+//       img.name.match(new RegExp(`page-0*${page}\\.png$`))
+//     );
+
+//   /* ================= WHOLE PAGES ================= */
+//   if (Array.isArray(coordinates.wholePages)) {
+//     for (const page of coordinates.wholePages) {
+//       const pageImage = findPageImage(page);
+//       if (!pageImage) {
+//         console.warn(`⚠️ Page ${page}: image not found`);
+//         continue;
+//       }
+
+//       const sourcePath = path.join(pageImagesFolder, pageImage.name);
+//       const outputName = `image_${imageCounter}.png`;
+//       const outputPath = path.join(outputFolder, outputName);
+
+//       await sharp(sourcePath).toFile(outputPath);
+
+//       results.push({
+//         type: "whole",
+//         page,
+//         image: outputName,
+//       });
+
+//       imageCounter++; // ✅ increment
+//     }
+//   }
+
+//   /* ================= PARTIAL AREAS ================= */
+//   if (coordinates.partialAreas) {
+//     for (const [pageStr, areas] of Object.entries(coordinates.partialAreas)) {
+//       const page = Number(pageStr);
+//       const pageImage = findPageImage(page);
+//       if (!pageImage) {
+//         console.warn(`⚠️ Page ${page}: image not found`);
+//         continue;
+//       }
+
+//       const sourcePath = path.join(pageImagesFolder, pageImage.name);
+
+//       for (const area of areas) {
+//         const { x, y, width, height } = area;
+//         if (width <= 0 || height <= 0) continue;
+
+//         const outputName = `image_${imageCounter}.png`;
+//         const outputPath = path.join(outputFolder, outputName);
+
+//         await sharp(sourcePath)
+//           .extract({
+//             left: Math.round(x),
+//             top: Math.round(y),
+//             width: Math.round(width),
+//             height: Math.round(height),
+//           })
+//           .toFile(outputPath);
+
+//         results.push({
+//           type: "partial",
+//           page,
+//           image: outputName,
+//         });
+
+//         imageCounter++; // ✅ increment
+//       }
+//     }
+//   }
+
+//   console.log(`📊 Total question images extracted: ${results.length}`);
+//   return results;
+// };
+
 const assigningTask = async (req, res) => {
-  const { userId, subjectCode, bookletsToAssign } = req.body;
-  console.log("userId, subjectCode, bookletsToAssign", userId, subjectCode, bookletsToAssign);
+  const { userId, subjectCode, questiondefinitionId, bookletsToAssign } =
+    req.body;
+  console.log(
+    "userId,  subjectCode,questionDefinitionId, bookletsToAssign",
+    userId,
+    subjectCode,
+    questiondefinitionId,
+    bookletsToAssign,
+  );
 
   const session = await mongoose.startSession();
 
   try {
     session.startTransaction();
 
-    if (!userId || !subjectCode) {
+    if (!userId || !subjectCode || !questiondefinitionId || !bookletsToAssign) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
@@ -156,17 +365,32 @@ const assigningTask = async (req, res) => {
     }).session(session);
 
     // If NO existing task → create one
-    if (!task) {
+    // if (!task) {
+    //   task = new Task({
+    //     subjectCode,
+    //     userId: user._id,
+    //     questionDefinitionId: questionDefinitionId,
+    //     totalBooklets: 0,
+    //     status: "inactive",
+    //     currentFileIndex: 1,
+    //   });
+
+    //   await task.save({ session });
+    // }
+    if (task) {
+      task.questiondefinitionId = questiondefinitionId; // ✅ FIX
+    } else {
       task = new Task({
         subjectCode,
         userId: user._id,
+        questiondefinitionId,
         totalBooklets: 0,
         status: "inactive",
         currentFileIndex: 1,
       });
-
-      await task.save({ session });
     }
+
+    await task.save({ session });
 
     // Increase task booklet count
     task.totalBooklets += pdfsToBeAssigned.length;
@@ -248,12 +472,7 @@ const assigningTask = async (req, res) => {
 };
 
 const reassignPendingBooklets = async (req, res) => {
-  const {
-    fromTaskId,
-    toUserId,
-    transferCount,
-    reassignedBy,
-  } = req.body;
+  const { fromTaskId, toUserId, transferCount, reassignedBy } = req.body;
 
   console.log("Reassignment request:", req.body);
 
@@ -262,12 +481,7 @@ const reassignPendingBooklets = async (req, res) => {
   try {
     session.startTransaction();
 
-    if (
-      !fromTaskId ||
-      !toUserId ||
-      !transferCount ||
-      transferCount <= 0
-    ) {
+    if (!fromTaskId || !toUserId || !transferCount || transferCount <= 0) {
       return res.status(400).json({ message: "Invalid payload" });
     }
 
@@ -308,10 +522,10 @@ const reassignPendingBooklets = async (req, res) => {
       taskId: fromTask._id,
       status: { $in: ["false", "progress"] },
     })
-    .limit(Number(transferCount))
-    .session(session);
+      .limit(Number(transferCount))
+      .session(session);
 
-      console.log("pending pdfs", pendingPdfs.length);
+    console.log("pending pdfs", pendingPdfs.length);
 
     if (pendingPdfs.length < transferCount) {
       return res.status(400).json({
@@ -351,7 +565,7 @@ const reassignPendingBooklets = async (req, res) => {
           reassignedBy,
         },
       ],
-      { session }
+      { session },
     );
 
     await session.commitTransaction();
@@ -374,13 +588,8 @@ const reassignPendingBooklets = async (req, res) => {
 };
 
 const reassignBooklets = async (req, res) => {
-  const {
-    fromUserId,
-    toUserId,
-    subjectCode,
-    transferCount,
-    reassignedBy,
-  } = req.body;
+  const { fromUserId, toUserId, subjectCode, transferCount, reassignedBy } =
+    req.body;
 
   const session = await mongoose.startSession();
 
@@ -473,7 +682,7 @@ const reassignBooklets = async (req, res) => {
           reassignedBy,
         },
       ],
-      { session }
+      { session },
     );
 
     await session.commitTransaction();
@@ -574,20 +783,18 @@ const getUserCurrentTaskStatus = async (req, res) => {
         currentFileIndex: task.currentFileIndex,
 
         statusBreakdown: {
-          completed: completedBooklets,   // status === true
-          progress: progressBooklets,     // always 0 for now
-          pending: pendingBooklets        // status === false
-        },         
+          completed: completedBooklets, // status === true
+          progress: progressBooklets, // always 0 for now
+          pending: pendingBooklets, // status === false
+        },
 
         schema: schemaRelation
           ? {
               schemaId: schemaRelation.schemaId,
               questionPdfPath: schemaRelation.questionPdfPath,
               answerPdfPath: schemaRelation.answerPdfPath,
-              countOfQuestionImages:
-                schemaRelation.countOfQuestionImages,
-              countOfAnswerImages:
-                schemaRelation.countOfAnswerImages,
+              countOfQuestionImages: schemaRelation.countOfQuestionImages,
+              countOfAnswerImages: schemaRelation.countOfAnswerImages,
             }
           : null,
 
@@ -1031,61 +1238,275 @@ const autoAssigning = async (req, res) => {
 const removeAssignedTask = async (req, res) => {
   const { id } = req.params;
 
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "Invalid task ID." });
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    // Validate task ID
-    if (!isValidObjectId(id)) {
-      return res.status(400).json({ message: "Invalid task ID." });
-    }
-
-    // Start a session to handle the deletion as a transaction
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    // Validate if the provided task ID is a valid MongoDB ObjectId
-
-    try {
-      // Find and delete the task
-      const task = await Task.findByIdAndDelete(id, { session });
-      if (!task) {
-        // Start a MongoDB session to handle the deletion as a transaction
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(404).json({ message: "Task not found" });
-      }
-
-      // Attempt to find and delete the task by its ID
-      // Delete all related AnswerPdf documents
-      await AnswerPdf.deleteMany({ taskId: id }, { session });
-
-      // If the task doesn't exist, abort the transaction and return a 404 response
-      // Commit the transaction
-      await session.commitTransaction();
-      session.endSession();
-
-      res
-        .status(200)
-        .json({ message: "Task and associated PDFs deleted successfully" });
-      // Delete all AnswerPdf documents associated with the task ID
-    } catch (error) {
-      // Rollback the transaction in case of an error
+    const task = await Task.findById(id).session(session);
+    if (!task) {
       await session.abortTransaction();
-      // Commit the transaction after successful deletions
       session.endSession();
-      console.error("Error during task and PDF deletion:", error);
-      res.status(500).json({
-        message: "Failed to delete task and associated PDFs",
-        error: error.message,
-      });
+      return res.status(404).json({ message: "Task not found" });
     }
-    // Send a success response after task and its PDFs are deleted
+
+    const countOfAnswerPdfs = await AnswerPdf.countDocuments({
+      taskId: id,
+    }).session(session);
+
+    const subjectcode = task.subjectCode;
+    console.log("subjectcode", subjectcode);
+
+    const subject = await Subject.findOne({ code: subjectcode })
+      .select("name")
+      .session(session);
+
+    if (!subject) {
+      throw new Error("Subject not found");
+    }
+
+    await SubjectFolderModel.updateOne(
+      { folderName: String(subjectcode) },
+      {
+        $inc: {
+          unAllocated: countOfAnswerPdfs, // increment
+          allocated: -countOfAnswerPdfs, // decrement
+          evaluation_pending: -countOfAnswerPdfs, // decrement
+        },
+      },
+      { session },
+    );
+
+    await AnswerPdf.deleteMany({ taskId: id }).session(session);
+    await Task.findByIdAndDelete(id).session(session);
+    console.log("task is deleted");
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      message: "Task and associated PDFs deleted successfully",
+    });
   } catch (error) {
-    console.error("Error deleting task:", error);
-    // Rollback the transaction in case of an error during deletion
-    res
-      .status(500)
-      .json({ message: "Failed to delete task", error: error.message });
+    await session.abortTransaction();
+    session.endSession();
+
+    console.error("Error during task and PDF deletion:", error);
+    return res.status(500).json({
+      message: "Failed to delete task and associated PDFs",
+      error: error.message,
+    });
   }
 };
 // const activeTimers = {}; // To track active timers per task
+// const getAssignTaskById = async (req, res) => {
+//   const { id } = req.params;
+
+//   try {
+//     if (!isValidObjectId(id)) {
+//       return res.status(400).json({ message: "Invalid task ID." });
+//     }
+
+//     const task = await Task.findById(id);
+//     if (!task) {
+//       return res.status(404).json({ message: "Task not found." });
+//     }
+
+//     // Initialize task timing
+//     if (!task.startTime) {
+//       task.startTime = new Date();
+//       task.lastResumedAt = new Date();
+//       task.status = "active";
+//       await task.save();
+//     }
+
+//     const subject = await Subject.findOne({ code: task.subjectCode });
+//     if (!subject) {
+//       return res.status(404).json({ message: "Subject not found (create subject)." });
+//     }
+
+//     const courseSchemaRel = await SubjectSchemaRelation.findOne({
+//       subjectId: subject._id,
+//     });
+//     if (!courseSchemaRel) {
+//       return res.status(404).json({
+//         message: "Schema not found for subject (upload master answer and master question).",
+//       });
+//     }
+
+//     const schemaDetails = await Schema.findById(courseSchemaRel.schemaId);
+//     if (!schemaDetails) {
+//       return res.status(404).json({ message: "Schema not found." });
+//     }
+
+//     const minTime = schemaDetails.minTime;
+//     const maxTime = schemaDetails.maxTime;
+
+//     // Calculate remaining time
+//     let remainingSeconds = 0;
+//     if (task.status === "paused" && task.remainingTimeInSec != null) {
+//       remainingSeconds = task.remainingTimeInSec;
+//       task.lastResumedAt = new Date();
+//       task.status = "active";
+//       await task.save();
+//     } else if (task.status === "active" && task.lastResumedAt) {
+//       const elapsedSeconds = Math.floor((new Date() - task.lastResumedAt) / 1000);
+//       remainingSeconds = Math.max((task.remainingTimeInSec ?? maxTime * 60) - elapsedSeconds, 0);
+//     } else {
+//       remainingSeconds = maxTime * 60;
+//     }
+
+//     // Folder setup
+//     const rootFolder = path.join(__dirname, "processedFolder");
+//     const subjectFolder = path.join(rootFolder, task.subjectCode);
+
+//     if (!fs.existsSync(subjectFolder)) {
+//       return res.status(404).json({ message: "Subject folder not found." });
+//     }
+
+//     const extractedBookletsFolder = path.join(subjectFolder, "extractedBooklets");
+//     if (!fs.existsSync(extractedBookletsFolder)) {
+//       fs.mkdirSync(extractedBookletsFolder, { recursive: true });
+//     }
+
+//     // Get assigned PDFs
+//     const assignedPdfs = await AnswerPdf.find({ taskId: task._id });
+    
+//     // Update pending PDFs to "progress"
+//     await AnswerPdf.updateMany(
+//       { taskId: task._id, status: "false" },
+//       { $set: { status: "progress" } }
+//     );
+
+//     if (assignedPdfs.length === 0) {
+//       return res.status(404).json({ message: "No PDFs assigned to this task." });
+//     }
+
+//     console.log(`📊 TOTAL PDFS ASSIGNED: ${assignedPdfs.length}`);
+
+//     const currentPdf = assignedPdfs[task.currentFileIndex - 1];
+//     if (!currentPdf) {
+//       return res.status(404).json({ message: "No PDF found for the current file index." });
+//     }
+
+//     console.log(`📄 CURRENT PDF: ${currentPdf.answerPdfName}`);
+//     console.log(`📁 Current File Index: ${task.currentFileIndex}`);
+
+//     const pdfPath = path.join(subjectFolder, currentPdf.answerPdfName);
+//     if (!fs.existsSync(pdfPath)) {
+//       return res.status(404).json({ 
+//         message: `PDF file ${currentPdf.answerPdfName} not found.` 
+//       });
+//     }
+
+//     const currentPdfFolder = path.join(
+//       extractedBookletsFolder,
+//       path.basename(currentPdf.answerPdfName, ".pdf")
+//     );
+
+//     let extractedBookletPath = `processedFolder/${task.subjectCode}/extractedBooklets/${path.basename(currentPdf.answerPdfName, ".pdf")}`;
+
+//     // ✅ Build base URL for HTTP access
+//     const baseUrl = `${req.protocol}://${req.get("host")}`;
+//     const bookletName = path.basename(currentPdf.answerPdfName, ".pdf");
+    
+//     // ✅ Convert file paths to accessible URLs
+//     // const extractedBookletUrl = `${baseUrl}/api/files/processed/${task.subjectCode}/extractedBooklets/${bookletName}`;
+    
+//     const questionImagesFolderUrl = `${baseUrl}/api/files/processed/${task.subjectCode}/extractedBooklets/${bookletName}/questionImages/${task.questiondefinitionId}`;
+
+//     // ✅ Check if images already extracted
+//     let extractedImages = await AnswerPdfImage.find({
+//       answerPdfId: currentPdf._id,
+//     });
+
+//     console.log(`🖼️ EXISTING EXTRACTED IMAGES IN DATABASE: ${extractedImages.length}`);
+
+//     // ✅ If no images, extract them from PDF
+//     if (extractedImages.length === 0) {
+//       console.log("📤 Extracting images from PDF for the first time...");
+      
+//       if (!fs.existsSync(currentPdfFolder)) {
+//         fs.mkdirSync(currentPdfFolder, { recursive: true });
+//       }
+
+//       const imageFiles = await extractImagesFromPdf(pdfPath, currentPdfFolder);
+
+//       const imageDocs = imageFiles.map((imageFileName, i) => ({
+//         answerPdfId: currentPdf._id,
+//         name: imageFileName,
+//         status: i === 0 ? "visited" : "notVisited",
+//       }));
+
+//       extractedImages = await AnswerPdfImage.insertMany(imageDocs);
+//       console.log(`✅ Extracted ${extractedImages.length} images from PDF`);
+//     }
+
+//     // ✅ Validate questionDefinitionId
+//     if (!task.questiondefinitionId) {
+//       return res.status(400).json({
+//         message: "Task missing questionDefinitionId",
+//       });
+//     }
+
+//     console.log("questionDefinitionId:", task.questiondefinitionId.toString());
+
+//     // ✅ Get question definition
+//     const questionDef = await QuestionDefinition.findById(task.questiondefinitionId);
+
+//     if (!questionDef || !questionDef.coordinates) {
+//       return res.status(404).json({
+//         message: "QuestionDefinition or coordinates not found",
+//       });
+//     }
+
+//     console.log("Question coordinates:", JSON.stringify(questionDef.coordinates, null, 2));
+
+//     // ✅ Extract question images
+//     const questionImagesFolder = path.join(
+//       currentPdfFolder,
+//       "questionImages",
+//       String(task.questiondefinitionId)
+//     );
+
+//     console.log("📁 Question images output folder:", questionImagesFolder);
+
+//     const questionImages = await extractQuestionImages(
+//       questionDef.coordinates,   // wholePages + partialAreas
+//       extractedImages,           // page images from DB
+//       currentPdfFolder,          // source folder
+//       questionImagesFolder       // output folder
+//     );
+
+//     console.log("question images ", questionImages.length);
+
+//     console.log(`✅ Question images extracted: ${questionImages.length}`);
+
+//     // ✅ Return response with question images
+//     return res.status(200).json({
+//       task,
+//       remainingSeconds,
+//       answerPdfDetails: currentPdf,
+//       schemaDetails,
+//       extractedBookletPath,
+//       questionImages,  // ✅ Contains array of question images
+//       questionImagesPath: `${extractedBookletPath}/questionImages/${task.questiondefinitionId}`,
+
+//       questionImagesFolderUrl
+//     });
+
+//   } catch (error) {
+//     console.error("❌ Error fetching task:", error.message);
+//     console.error(error.stack);
+//     res.status(500).json({ 
+//       message: "Failed to process task", 
+//       error: error.message 
+//     });
+//   }
+// };
 const getAssignTaskById = async (req, res) => {
   const { id } = req.params;
 
@@ -1099,21 +1520,17 @@ const getAssignTaskById = async (req, res) => {
       return res.status(404).json({ message: "Task not found." });
     }
 
-    // If start time isn't set, initialize it now
+    // Initialize task timing
     if (!task.startTime) {
       task.startTime = new Date();
-      task.lastResumedAt = new Date(); // new field
+      task.lastResumedAt = new Date();
       task.status = "active";
-
       await task.save();
     }
 
     const subject = await Subject.findOne({ code: task.subjectCode });
-
     if (!subject) {
-      return res
-        .status(404)
-        .json({ message: "Subject not found (create subject)." });
+      return res.status(404).json({ message: "Subject not found (create subject)." });
     }
 
     const courseSchemaRel = await SubjectSchemaRelation.findOne({
@@ -1121,8 +1538,7 @@ const getAssignTaskById = async (req, res) => {
     });
     if (!courseSchemaRel) {
       return res.status(404).json({
-        message:
-          "Schema not found for subject (upload master answer and master question).",
+        message: "Schema not found for subject (upload master answer and master question).",
       });
     }
 
@@ -1131,40 +1547,24 @@ const getAssignTaskById = async (req, res) => {
       return res.status(404).json({ message: "Schema not found." });
     }
 
-    const minTime = schemaDetails.minTime; // in minutes
-    const maxTime = schemaDetails.maxTime; // in minutes
+    const minTime = schemaDetails.minTime;
+    const maxTime = schemaDetails.maxTime;
 
-    // --- Utility: format seconds to HH:mm:ss ---
-    const formatSecondsToHHMMSS = (totalSeconds) => {
-      const hrs = Math.floor(totalSeconds / 3600);
-      const mins = Math.floor((totalSeconds % 3600) / 60);
-      const secs = totalSeconds % 60;
-      const hStr = String(hrs).padStart(2, "0");
-      const mStr = String(mins).padStart(2, "0");
-      const sStr = String(secs).padStart(2, "0");
-      return `${hStr}:${mStr}:${sStr}`;
-    };
-
-    // ✅ MODIFIED: Calculate remaining time logic
+    // Calculate remaining time
     let remainingSeconds = 0;
-
     if (task.status === "paused" && task.remainingTimeInSec != null) {
       remainingSeconds = task.remainingTimeInSec;
       task.lastResumedAt = new Date();
       task.status = "active";
+      await task.save();
     } else if (task.status === "active" && task.lastResumedAt) {
-      // Calculate elapsed time since last resume
-      const elapsedSeconds = Math.floor(
-        (new Date() - task.lastResumedAt) / 1000,
-      );
-      remainingSeconds = Math.max(
-        (task.remainingTimeInSec ?? maxTime * 60) - elapsedSeconds,
-        0,
-      );
+      const elapsedSeconds = Math.floor((new Date() - task.lastResumedAt) / 1000);
+      remainingSeconds = Math.max((task.remainingTimeInSec ?? maxTime * 60) - elapsedSeconds, 0);
     } else {
       remainingSeconds = maxTime * 60;
     }
 
+    // Folder setup
     const rootFolder = path.join(__dirname, "processedFolder");
     const subjectFolder = path.join(rootFolder, task.subjectCode);
 
@@ -1172,35 +1572,29 @@ const getAssignTaskById = async (req, res) => {
       return res.status(404).json({ message: "Subject folder not found." });
     }
 
-    const extractedBookletsFolder = path.join(
-      subjectFolder,
-      "extractedBooklets",
-    );
+    const extractedBookletsFolder = path.join(subjectFolder, "extractedBooklets");
     if (!fs.existsSync(extractedBookletsFolder)) {
       fs.mkdirSync(extractedBookletsFolder, { recursive: true });
     }
 
+    // Get assigned PDFs
     const assignedPdfs = await AnswerPdf.find({ taskId: task._id });
+    
+    // Update pending PDFs to "progress"
     await AnswerPdf.updateMany(
       { taskId: task._id, status: "false" },
-      { $set: { status: "progress" } },
+      { $set: { status: "progress" } }
     );
-    assignedPdfs.forEach((pdf, index) => {
-      console.log(`   PDF ${index + 1}: ${pdf.answerPdfName}`);
-    });
+
     if (assignedPdfs.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No PDFs assigned to this task." });
+      return res.status(404).json({ message: "No PDFs assigned to this task." });
     }
+
     console.log(`📊 TOTAL PDFS ASSIGNED: ${assignedPdfs.length}`);
 
     const currentPdf = assignedPdfs[task.currentFileIndex - 1];
-    console.log(`📄 CURRENT PDF ID: ${currentPdf._id}`);
     if (!currentPdf) {
-      return res
-        .status(404)
-        .json({ message: "No PDF found for the current file index." });
+      return res.status(404).json({ message: "No PDF found for the current file index." });
     }
 
     console.log(`📄 CURRENT PDF: ${currentPdf.answerPdfName}`);
@@ -1208,159 +1602,118 @@ const getAssignTaskById = async (req, res) => {
 
     const pdfPath = path.join(subjectFolder, currentPdf.answerPdfName);
     if (!fs.existsSync(pdfPath)) {
-      return res
-        .status(404)
-        .json({ message: `PDF file ${currentPdf.answerPdfName} not found.` });
-    }
-
-    const extractedImages = await AnswerPdfImage.find({
-      answerPdfId: currentPdf._id,
-    });
-    console.log(
-      `🖼️ EXISTING EXTRACTED IMAGES IN DATABASE: ${extractedImages.length}`,
-    );
-
-    let extractedBookletPath = `processedFolder/${
-      task.subjectCode
-    }/extractedBooklets/${path.basename(currentPdf.answerPdfName, ".pdf")}`;
-
-    const currentPdfFolder = path.join(
-      extractedBookletsFolder,
-      path.basename(currentPdf.answerPdfName, ".pdf"),
-    );
-
-    // Define directory structure for completedFolder
-    const completedFolder = path.join(__dirname, "completedFolder");
-    const subjectCompletedFolder = path.join(completedFolder, task.subjectCode);
-    const bookletFolder = path.join(
-      subjectCompletedFolder,
-      path.basename(currentPdf.answerPdfName, ".pdf"),
-    );
-
-    if (!fs.existsSync(completedFolder)) fs.mkdirSync(completedFolder);
-    if (!fs.existsSync(subjectCompletedFolder))
-      fs.mkdirSync(subjectCompletedFolder);
-    if (!fs.existsSync(bookletFolder)) fs.mkdirSync(bookletFolder);
-
-    const hiddenPages = schemaDetails.hiddenPage || [];
-    console.log("hiddenPages", hiddenPages);
-
-    // if (extractedImages.length > 0) {
-    //   // MOVE HIDDEN IMAGES TO SECURE LOCATION
-    //   for (const [index, image] of extractedImages.entries()) {
-    //     if (hiddenPages.includes(index)) {
-    //       const sourceImagePath = path.join(currentPdfFolder, image.name);
-    //       const destinationImagePath = path.join(bookletFolder, image.name);
-
-    //       if (fs.existsSync(sourceImagePath)) {
-    //         // Move hidden image to completedFolder (secure location)
-    //         fs.renameSync(sourceImagePath, destinationImagePath);
-    //         console.log(`Moved hidden image: ${image.name} to secure location`);
-    //       }
-    //     }
-    //   }
-
-    //   const visibleImages = extractedImages.filter(
-    //     (_, index) => !hiddenPages.includes(index)
-    //   );
-
-    //   return res.status(200).json({
-    //     task,
-    //     remainingSeconds,
-    //     answerPdfDetails: currentPdf,
-    //     schemaDetails,
-    //     extractedBookletPath,
-    //     answerPdfImages: visibleImages,
-    //   });
-    // }
-    if (extractedImages.length > 0) {
-      // MOVE HIDDEN IMAGES TO SECURE LOCATION IMMEDIATELY AFTER EXTRACTION
-      const hiddenImages = extractedImages.filter((_, index) =>
-        hiddenPages.includes(index),
-      );
-
-      console.log("hidden images", hiddenImages);
-
-      for (const image of hiddenImages) {
-        const sourceImagePath = path.join(currentPdfFolder, image.name);
-        const destinationImagePath = path.join(bookletFolder, image.name);
-
-        if (fs.existsSync(sourceImagePath)) {
-          // Move hidden image to completedFolder (secure location)
-          fs.renameSync(sourceImagePath, destinationImagePath);
-          console.log(`Moved hidden image: ${image.name} to secure location`);
-        } else {
-          console.error(`Hidden image not found: ${sourceImagePath}`);
-        }
-      }
-
-      const visibleImages = extractedImages.filter(
-        (_, index) => !hiddenPages.includes(index),
-      );
-
-      return res.status(200).json({
-        task,
-        remainingSeconds,
-        answerPdfDetails: currentPdf,
-        schemaDetails,
-        extractedBookletPath,
-        answerPdfImages: visibleImages,
+      return res.status(404).json({ 
+        message: `PDF file ${currentPdf.answerPdfName} not found.` 
       });
     }
 
-    // If no extracted images exist, extract them
-    if (!fs.existsSync(currentPdfFolder)) {
-      fs.mkdirSync(currentPdfFolder, { recursive: true });
+    const bookletName = path.basename(currentPdf.answerPdfName, ".pdf");
+    
+    const currentPdfFolder = path.join(
+      extractedBookletsFolder,
+      bookletName
+    );
+
+    let extractedBookletPath = `processedFolder/${task.subjectCode}/extractedBooklets/${bookletName}`;
+
+    // ✅ Build base URL for HTTP access
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    
+    const questionImagesFolderUrl = `processedFolder/${task.subjectCode}/extractedBooklets/${bookletName}/questionImages/${task.questiondefinitionId}`;
+
+    // ✅ Check if images already extracted
+    let extractedImages = await AnswerPdfImage.find({
+      answerPdfId: currentPdf._id,
+    });
+
+    console.log(`🖼️ EXISTING EXTRACTED IMAGES IN DATABASE: ${extractedImages.length}`);
+
+    // ✅ If no images, extract them from PDF
+    if (extractedImages.length === 0) {
+      console.log("📤 Extracting images from PDF for the first time...");
+      
+      if (!fs.existsSync(currentPdfFolder)) {
+        fs.mkdirSync(currentPdfFolder, { recursive: true });
+      }
+
+      const imageFiles = await extractImagesFromPdf(pdfPath, currentPdfFolder);
+
+      const imageDocs = imageFiles.map((imageFileName, i) => ({
+        answerPdfId: currentPdf._id,
+        name: imageFileName,
+        status: i === 0 ? "visited" : "notVisited",
+      }));
+
+      extractedImages = await AnswerPdfImage.insertMany(imageDocs);
+      console.log(`✅ Extracted ${extractedImages.length} images from PDF`);
     }
 
-    const imageFiles = await extractImagesFromPdf(pdfPath, currentPdfFolder);
+    // ✅ Validate questionDefinitionId
+    if (!task.questiondefinitionId) {
+      return res.status(400).json({
+        message: "Task missing questionDefinitionId",
+      });
+    }
 
-    const imageDocs = imageFiles.map((imageFileName, i) => ({
-      answerPdfId: currentPdf._id,
-      name: imageFileName,
-      status: i === 0 ? "visited" : "notVisited",
+    console.log("questionDefinitionId:", task.questiondefinitionId.toString());
+
+    // ✅ Get question definition
+    const questionDef = await QuestionDefinition.findById(task.questiondefinitionId);
+
+    if (!questionDef || !questionDef.coordinates) {
+      return res.status(404).json({
+        message: "QuestionDefinition or coordinates not found",
+      });
+    }
+
+    console.log("Question coordinates:", JSON.stringify(questionDef.coordinates, null, 2));
+
+    // ✅ Extract question images
+    const questionImagesFolder = path.join(
+      currentPdfFolder,
+      "questionImages",
+      String(task.questiondefinitionId)
+    );
+
+    console.log("📁 Question images output folder:", questionImagesFolder);
+
+    const questionImages = await extractQuestionImages(
+      questionDef.coordinates,   // wholePages + partialAreas
+      extractedImages,           // page images from DB
+      currentPdfFolder,          // source folder
+      questionImagesFolder       // output folder
+    );
+
+    console.log(`✅ Question images extracted: ${questionImages.length}`);
+
+    // ✅ ADD URLs TO EACH QUESTION IMAGE
+    const questionImagesWithUrls = questionImages.map(img => ({
+      ...img,
+      url: `${questionImagesFolderUrl}/${img.image}`
     }));
 
-    const insertedImages = await AnswerPdfImage.insertMany(imageDocs);
-
-    // MOVE HIDDEN IMAGES TO SECURE LOCATION IMMEDIATELY AFTER EXTRACTION
-    const hiddenImages = insertedImages.filter((_, index) =>
-      hiddenPages.includes(index),
-    );
-
-    for (const image of hiddenImages) {
-      const sourceImagePath = path.join(currentPdfFolder, image.name);
-      const destinationImagePath = path.join(bookletFolder, image.name);
-
-      if (fs.existsSync(sourceImagePath)) {
-        // Move hidden image to completedFolder (secure location)
-        fs.renameSync(sourceImagePath, destinationImagePath);
-        console.log(`Moved hidden image: ${image.name} to secure location`);
-      } else {
-        console.error(`Hidden image not found: ${sourceImagePath}`);
-      }
-    }
-
-    const visibleImages = insertedImages.filter(
-      (_, index) => !hiddenPages.includes(index),
-    );
-
+    // ✅ Return response with question images
     return res.status(200).json({
       task,
+      questionDef,
       remainingSeconds,
       answerPdfDetails: currentPdf,
       schemaDetails,
       extractedBookletPath,
-      answerPdfImages: visibleImages,
+      questionImagesPath: `${extractedBookletPath}/questionImages/${task.questiondefinitionId}`,
+      questionImagesFolderUrl,  // ✅ Folder URL
+      questionImages: questionImagesWithUrls,  // ✅ Images with individual URLs
     });
+
   } catch (error) {
-    console.error("Error fetching task:", error.message);
-    res
-      .status(500)
-      .json({ message: "Failed to process task", error: error.message });
+    console.error("❌ Error fetching task:", error.message);
+    console.error(error.stack);
+    res.status(500).json({ 
+      message: "Failed to process task", 
+      error: error.message 
+    });
   }
 };
-
 // Utility to clear interval for a task
 
 const getAllTaskHandler = async (req, res) => {
@@ -1707,58 +2060,56 @@ const completedBookletHandler = async (req, res) => {
     const { submitted } = req.body;
 
     const taskDoc = await AnswerPdf.findById(answerpdfid)
-    .select("taskId")
-    .lean();
-    
+      .select("taskId")
+      .lean();
+
     const taskId = taskDoc?.taskId;
 
     console.log("taskId", taskId);
 
-    const taskData = await Task.findById(taskId)
-    .select("subjectCode")
-    .lean();
+    const taskData = await Task.findById(taskId).select("subjectCode").lean();
 
     const subjectCode = taskData?.subjectCode;
 
     console.log("subjectCode", subjectCode);
 
-        // 1️⃣ Get subject
+    // 1️⃣ Get subject
     const subject = await Subject.findOne({ code: subjectCode })
       .select("_id")
       .lean();
-      
+
     if (!subject) {
       return res.status(404).json({
         success: false,
         message: "Subject not found",
       });
     }
-    
+
     // 2️⃣ Get subject-schema relation
     const schemaRelation = await SubjectSchemaRelation.findOne({
       subjectId: subject._id,
     })
-    .select("schemaId")
-    .lean();
-    
+      .select("schemaId")
+      .lean();
+
     if (!schemaRelation) {
       return res.status(404).json({
         success: false,
         message: "Schema relation not found for subject",
       });
     }
-    
+
     // 3️⃣ Get schema timing
     const schemaDoc = await Schema.findById(schemaRelation.schemaId)
       .select("minTime maxTime")
       .lean();
-    
+
     const minTime = schemaDoc?.minTime;
     const maxTime = schemaDoc?.maxTime;
 
     console.log(minTime);
     console.log(maxTime);
-    
+
     if (minTime == null || maxTime == null) {
       return res.status(400).json({
         success: false,
@@ -1942,24 +2293,10 @@ const completedBookletHandler = async (req, res) => {
 
     const task = await Task.findById(answerPdfDoc.taskId);
 
-    const tasks = await Task.find({ subjectCode: task.subjectCode });
-
-    let totalBooklets = 0;
-    let completedBooklets = 0;
-
     // Process each task and update the booklet counts
-    for (const currentTask of tasks) {
-      const answerPdfs = await AnswerPdf.find({
-        taskId: currentTask._id,
-        status: "true",
-      });
 
-      totalBooklets += currentTask.totalBooklets;
-      console.log("total booklets", currentTask.totalBooklets);
-
-      completedBooklets += answerPdfs.length;
-      console.log("completedBooklets", completedBooklets);
-    }
+    task.totalBooklets -= 1;
+    await task.save();
 
     const subjectFolderDetails = await SubjectFolderModel.findOne({
       folderName: task.subjectCode,
@@ -1969,25 +2306,34 @@ const completedBookletHandler = async (req, res) => {
     }
 
     // Update folder details
-    subjectFolderDetails.evaluated = completedBooklets;
-    subjectFolderDetails.evaluation_pending = totalBooklets - completedBooklets;
+    subjectFolderDetails.evaluated += 1;
+    subjectFolderDetails.evaluation_pending -= 1;
+    subjectFolderDetails.allocated -= 1;
     await subjectFolderDetails.save();
 
     // Check if all booklets are completed
-    if (completedBooklets === totalBooklets) {
+    if (task.totalBooklets === 0) {
       task.status = "success";
       await task.save();
       return res
         .status(200)
         .json({ message: "Task is completed", success: true });
+    } else {
+      //passed to the next booklet and along with response that booklet annotations synced successfully
+      return res.status(200).json({
+        success: true,
+        message: "Booklet submitted successfully",
+        taskCompleted: false,
+        currentAnswerPdfId: answerpdfid,
+      });
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Booklet annotations synced successfully",
-      totalSynced: bulkOps.length,
-      answerPdfId: answerpdfid,
-    });
+    // return res.status(200).json({
+    //   success: true,
+    //   message: "Booklet annotations synced successfully",
+    //   totalSynced: bulkOps.length,
+    //   answerPdfId: answerpdfid,
+    // });
   } catch (error) {
     console.error("❌ Error in completedBookletHandler:", error);
     return res.status(500).json({
@@ -2053,10 +2399,10 @@ const checkTaskCompletionHandler = async (req, res) => {
   }
 };
 
-const rejectBooklet = async (req, res)=> {
+const rejectBooklet = async (req, res) => {
   const { answerPdfId } = req.params;
-  const {reason, rejectedAt} = req.body;
-  try{
+  const { reason, rejectedAt } = req.body;
+  try {
     if (!isValidObjectId(answerPdfId)) {
       return res.status(400).json({ message: "Invalid answerPdfId." });
     }
@@ -2066,14 +2412,13 @@ const rejectBooklet = async (req, res)=> {
       rejectedAt: rejectedAt ? new Date(rejectedAt) : new Date(),
     });
     return res.status(200).json({ message: "Booklet rejected successfully." });
-  }
-  catch(error){ 
+  } catch (error) {
     console.error("Error rejecting booklet:", error);
     return res
       .status(500)
       .json({ message: "Failed to reject booklet", error: error.message });
   }
-}
+};
 
 export {
   assigningTask,
@@ -2091,5 +2436,5 @@ export {
   completedBookletHandler,
   checkTaskCompletionHandler,
   autoAssigning,
-  rejectBooklet
+  rejectBooklet,
 };

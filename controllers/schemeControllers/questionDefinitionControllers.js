@@ -1,3 +1,5 @@
+// questionDefinitionController.js
+
 import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchema.js";
 import { validateQuestionDefinition } from "../../errorHanding/validateQuestionDefinition.js";
 import Schema from "../../models/schemeModel/schema.js";
@@ -19,6 +21,8 @@ const createQuestionDefinition = async (req, res) => {
         marksDifference,
         numberOfSubQuestions,
         compulsorySubQuestions,
+        page,
+        coordinates,
     } = req.body;
 
     try {
@@ -33,9 +37,8 @@ const createQuestionDefinition = async (req, res) => {
             marksDifference,
             numberOfSubQuestions,
             compulsorySubQuestions,
-        });
-
-        
+            page,
+        });        
 
         if (!isValidObjectId(schemaId)) {
             return res.status(400).json({ message: "Invalid schemaId." });
@@ -43,6 +46,10 @@ const createQuestionDefinition = async (req, res) => {
 
         if (parentQuestionId && !isValidObjectId(parentQuestionId)) {
             return res.status(400).json({ message: "Invalid parentQuestionId." });
+        }
+
+        if (!page || page.length === 0) {
+            return res.status(400).json({ message: "Page is required" });
         }
 
         if (errorMessage) {
@@ -66,6 +73,8 @@ const createQuestionDefinition = async (req, res) => {
             marksDifference: marksDifference || 0,
             numberOfSubQuestions: isSubQuestion ? (numberOfSubQuestions) : 0,
             compulsorySubQuestions: isSubQuestion ? (compulsorySubQuestions) : 0,
+            page: Array.isArray(page) ? page : [page],
+            coordinates: coordinates || {},
         };
 
         const questionDefinition = new QuestionDefinition(questionDefinitionData);
@@ -98,6 +107,8 @@ const updateQuestionDefinition = async (req, res) => {
         marksDifference,
         numberOfSubQuestions,
         compulsorySubQuestions,
+        page,
+        coordinates,
     } = req.body;
 
     const { id } = req.params;
@@ -133,6 +144,10 @@ const updateQuestionDefinition = async (req, res) => {
             
         }
 
+        if (!page || page.length === 0) {
+            return res.status(400).json({ message: "Page is required" });
+        }
+
         // Check if the question definition exists
         const existingQuestion = await QuestionDefinition.findById(id);
         if (!existingQuestion) {
@@ -162,6 +177,8 @@ const updateQuestionDefinition = async (req, res) => {
             marksDifference: marksDifference || 0,
             numberOfSubQuestions: isSubQuestion ? (numberOfSubQuestions || 0) : 0,
             compulsorySubQuestions: isSubQuestion ? (compulsorySubQuestions || 0) : 0,
+            page: Array.isArray(page) ? page : [page],
+            coordinates: coordinates || {},
         };
 
         // Update the question definition
@@ -317,5 +334,3 @@ export {
     getQuestionDefinitionById,
     getAllPrimaryQuestionBasedOnSchemeId,
 }
-
-

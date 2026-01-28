@@ -1014,7 +1014,7 @@ const processingBookletsManually = async (req, res) => {
     const totalPages = pdfDoc.getPageCount();
 
     // Step 6: Define the expected number of pages (for example, we expect 10 pages)
-    const expectedPages = 10; // You can replace this with the actual expected number of pages based on schema
+    const expectedPages = schema.numberOfPage; // You can replace this with the actual expected number of pages based on schema
 
     let status = "";
 

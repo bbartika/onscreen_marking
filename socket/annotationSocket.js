@@ -31,7 +31,7 @@ export function getFilePath(userId, answerPdfId, page) {
   const pdfDir = path.join(
     String(baseDataDir),
     String(userId),
-    String(answerPdfId)
+    String(answerPdfId),
   );
 
   if (!fs.existsSync(pdfDir)) {
@@ -46,7 +46,7 @@ export function getMarksDataFilePath(userId, answerPdfId) {
   const pdfDir = path.join(
     String(baseDataDir),
     String(userId),
-    String(answerPdfId)
+    String(answerPdfId),
   );
 
   // Ensure directory exists
@@ -62,7 +62,7 @@ export function getMarksFilePath(userId, answerPdfId) {
   const pdfDir = path.join(
     String(baseDataDir),
     String(userId),
-    String(answerPdfId)
+    String(answerPdfId),
   );
 
   // Ensure directory exists
@@ -134,7 +134,7 @@ export default function handleAnnotationSocket(io) {
         const filePath = getFilePath(userId, answerPdfId, page);
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
         console.log(
-          `✅ Data saved for task ${taskId}, ${answerPdfId}, page ${page}`
+          `✅ Data saved for task ${taskId}, ${answerPdfId}, page ${page}`,
         );
       } catch (error) {
         console.error("Error saving data:", error);
@@ -148,7 +148,7 @@ export default function handleAnnotationSocket(io) {
         console.log("🚨 FORCE SAVING DATA");
         console.log(
           "Question 1 allottedMarks:",
-          data.marks.find((m) => m.questionsName === "1")?.allottedMarks
+          data.marks.find((m) => m.questionsName === "1")?.allottedMarks,
         );
 
         data.lastSaved = new Date().toISOString();
@@ -163,7 +163,7 @@ export default function handleAnnotationSocket(io) {
         const saved = JSON.parse(fs.readFileSync(filePath, "utf8"));
         console.log(
           "✅ VERIFIED - Saved Question 1 allottedMarks:",
-          saved.marks.find((m) => m.questionsName === "1")?.allottedMarks
+          saved.marks.find((m) => m.questionsName === "1")?.allottedMarks,
         );
       } catch (error) {
         console.error("❌ SAVE ERROR:", error);
@@ -248,7 +248,7 @@ export default function handleAnnotationSocket(io) {
 
         // Check if annotation with same timestamp ID already exists
         const existingAnnotationIndex = fileData.annotations.findIndex(
-          (ann) => ann.id === data.timeStamps
+          (ann) => ann.id === data.timeStamps,
         );
 
         if (existingAnnotationIndex !== -1) {
@@ -259,7 +259,7 @@ export default function handleAnnotationSocket(io) {
           };
           console.log(
             "✅ Existing annotation updated with ID:",
-            data.timeStamps
+            data.timeStamps,
           );
         } else {
           // ✅ ADD new annotation
@@ -284,10 +284,12 @@ export default function handleAnnotationSocket(io) {
           },
           {
             status: "submitted",
-          }
+          },
         );
+        emitMarksUpdate(io, taskId, userId, answerPdfId);
 
         console.log(`✅ Annotation added and broadcast to room: ${roomName}`);
+        // console.log("emitted fileData", fileData);
       } catch (error) {
         console.error("Error in add-annotation:", error);
       }
@@ -327,7 +329,7 @@ export default function handleAnnotationSocket(io) {
 
         // Check if comment with same timestamp ID already exists
         const existingCommentIndex = fileData.comments.findIndex(
-          (comment) => comment.id === commentObject.id
+          (comment) => comment.id === commentObject.id,
         );
 
         if (existingCommentIndex !== -1) {
@@ -398,12 +400,12 @@ export default function handleAnnotationSocket(io) {
         // )?.questionsName;
 
         fileData.annotations = fileData.annotations.filter(
-          (a) => !idSet.has(a.id)
+          (a) => !idSet.has(a.id),
         );
         const deletedCount = initialCount - fileData.annotations.length;
 
         console.log(
-          `✅ Deleted ${deletedCount} annotation(s), remaining: ${fileData.annotations.length}`
+          `✅ Deleted ${deletedCount} annotation(s), remaining: ${fileData.annotations.length}`,
         );
 
         saveData(taskId, userId, answerPdfId, page, fileData);
@@ -412,7 +414,7 @@ export default function handleAnnotationSocket(io) {
         console.log("marks data loaded for deletion");
 
         const existingMarksIndex = marksData.marks.findIndex(
-          (mark) => mark.question === questionName
+          (mark) => mark.question === questionName,
         );
 
         if (existingMarksIndex !== -1) {
@@ -441,7 +443,7 @@ export default function handleAnnotationSocket(io) {
             "Added:",
             newMarks,
             "Total:",
-            totalMarks
+            totalMarks,
           );
 
           saveMarks(userId, answerPdfId, marksData);
@@ -451,7 +453,7 @@ export default function handleAnnotationSocket(io) {
 
         const questionMarksData = loadMarksData(userId, answerPdfId);
         const existingMarksId = questionMarksData.marks.findIndex(
-          (mark) => mark.questionsName === String(questionName)
+          (mark) => mark.questionsName === String(questionName),
         );
 
         if (existingMarksId !== -1) {
@@ -482,7 +484,7 @@ export default function handleAnnotationSocket(io) {
             "Added:",
             newMarks,
             "Total:",
-            totalMarks
+            totalMarks,
           );
 
           saveMarksData(userId, answerPdfId, questionMarksData);
@@ -494,7 +496,7 @@ export default function handleAnnotationSocket(io) {
 
         if (parentQuestionId) {
           const parentIndex = questionMarksData.marks.findIndex(
-            (m) => m._id === parentQuestionId
+            (m) => m._id === parentQuestionId,
           );
           console.log("parentIndex", parentIndex);
 
@@ -520,7 +522,7 @@ export default function handleAnnotationSocket(io) {
           saveMarksData(userId, answerPdfId, questionMarksData);
           console.log(
             "questionMarksData after processing:",
-            questionMarksData.marks[parentIndex]
+            questionMarksData.marks[parentIndex],
           );
         }
 
@@ -554,7 +556,7 @@ export default function handleAnnotationSocket(io) {
           {
             ...fileData,
           },
-          { status: status }
+          { status: status },
         );
         console.log("DEBUG → page:", page);
         console.log("DEBUG → trying to update:", `image_${page}.png`);
@@ -574,11 +576,13 @@ export default function handleAnnotationSocket(io) {
                 status: status,
                 updatedAt: new Date(),
               },
-            }
+            },
           );
 
+          emitMarksUpdate(io, taskId, userId, answerPdfId);
+
           console.log(
-            `✅ DB Update - Matched: ${result.matchedCount}, Modified: ${result.modifiedCount}`
+            `✅ DB Update - Matched: ${result.matchedCount}, Modified: ${result.modifiedCount}`,
           );
 
           if (result.matchedCount === 0) {
@@ -624,13 +628,13 @@ export default function handleAnnotationSocket(io) {
         const initialCount = fileData.comments.length;
 
         fileData.comments = fileData.comments.filter(
-          (c) => c && c.id && !idSet.has(c.id) // Additional safety checks
+          (c) => c && c.id && !idSet.has(c.id), // Additional safety checks
         );
 
         const deletedCount = initialCount - fileData.comments.length;
 
         console.log(
-          `✅ Deleted ${deletedCount} comment(s), remaining: ${fileData.comments.length}`
+          `✅ Deleted ${deletedCount} comment(s), remaining: ${fileData.comments.length}`,
         );
 
         saveData(taskId, userId, answerPdfId, page, fileData);
@@ -678,7 +682,7 @@ export default function handleAnnotationSocket(io) {
         console.log("question-number", marksObject.parentQuestionId);
 
         const existingMarksIndex = marksData.marks.findIndex(
-          (mark) => mark.question === marksObject.question
+          (mark) => mark.question === marksObject.question,
         );
 
         if (existingMarksIndex !== -1) {
@@ -701,13 +705,13 @@ export default function handleAnnotationSocket(io) {
 
           console.log(
             "✅ Updated allottedMarks in marksData.json for ID:",
-            marksObject.id
+            marksObject.id,
           );
         } else {
           marksData.marks.push(marksObject);
           console.log(
             "❌ Mark not found in marksData.json with ID:",
-            marksObject.id
+            marksObject.id,
           );
         }
 
@@ -718,7 +722,7 @@ export default function handleAnnotationSocket(io) {
         console.log("questionMarksData loaded");
 
         const existingMarksId = questionMarksData.marks.findIndex(
-          (mark) => mark.questionsName === String(marksObject.question)
+          (mark) => mark.questionsName === String(marksObject.question),
         );
 
         if (existingMarksId !== -1) {
@@ -749,29 +753,29 @@ export default function handleAnnotationSocket(io) {
             "Added:",
             newMarks,
             "Total:",
-            totalMarks
+            totalMarks,
           );
           console.log("questionMarkData", questionMarksData);
 
           saveMarksData(userId, answerPdfId, questionMarksData);
           console.log(
             "questionMarksData after processing:",
-            questionMarksData.marks[existingMarksId]
+            questionMarksData.marks[existingMarksId],
           );
         } else {
           console.log(
             "❌ Question not found in questionMarksData.json:",
-            marksObject.question
+            marksObject.question,
           );
           console.log(
             "Available questions:",
-            questionMarksData.marks.map((mark) => mark.questionsName)
+            questionMarksData.marks.map((mark) => mark.questionsName),
           );
         }
 
         if (marksObject.parentQuestionId) {
           const parentIndex = questionMarksData.marks.findIndex(
-            (m) => m._id === marksObject.parentQuestionId
+            (m) => m._id === marksObject.parentQuestionId,
           );
           console.log("parentIndex", parentIndex);
 
@@ -796,16 +800,20 @@ export default function handleAnnotationSocket(io) {
             saveMarksData(userId, answerPdfId, questionMarksData);
             console.log(
               "questionMarksData after processing:",
-              questionMarksData.marks[parentIndex]
+              questionMarksData.marks[parentIndex],
             );
           }
         }
+
+        emitMarksUpdate(io, taskId, userId, answerPdfId);
 
         const roomName = `task_${taskId}`;
         io.to(roomName).emit("marks-updated", {
           ...questionMarksData,
           status: "completed",
         });
+
+        console.log("add-marks emitted", questionMarksData);
 
         console.log(`✅ Marks added and broadcast to room: ${roomName}`);
       } catch (error) {
@@ -982,7 +990,8 @@ export default function handleAnnotationSocket(io) {
         questionDefinitions.forEach((question, index) => {
           // Find the related Marks entry for the current questionDefinitionId
           const marks = marksData.find(
-            (m) => m.questionDefinitionId.toString() === question._id.toString()
+            (m) =>
+              m.questionDefinitionId.toString() === question._id.toString(),
           );
 
           // Use marks data if exists, otherwise use defaults
@@ -1020,14 +1029,14 @@ export default function handleAnnotationSocket(io) {
 
           fileData.marks.push(marksDataObj);
           console.log(
-            `✅ Processed question ${index + 1}: ${marksDataObj.questionsName}`
+            `✅ Processed question ${index + 1}: ${marksDataObj.questionsName}`,
           );
         });
 
         // Save to local file
         saveMarksData(userId, answerPdfId, fileData);
         console.log(
-          `✅ Saved ${fileData.marks.length} questions to local file`
+          `✅ Saved ${fileData.marks.length} questions to local file`,
         );
 
         // Emit back to the socket
@@ -1046,11 +1055,198 @@ export default function handleAnnotationSocket(io) {
       }
     });
 
+    socket.on("get-allquestions", async (data) => {
+      try {
+        console.log("📊 Get questions request:", data);
+
+        // Expect data to contain taskId and answerPdfId
+        const { taskId, userId, answerPdfId } = data;
+
+        if (answerPdfId === null || answerPdfId === undefined) {
+          return { annotations: [], comments: [] };
+        }
+
+        if (!taskId || !answerPdfId) {
+          throw new Error("taskId and answerPdfId are required");
+        }
+
+        // Validate IDs
+        if (!isValidObjectId(taskId)) {
+          throw new Error("Invalid task ID");
+        }
+
+        if (!isValidObjectId(answerPdfId)) {
+          throw new Error("Invalid answerPdfId");
+        }
+
+        // Check if marks data already exists in local file
+        const questionMarksData = loadMarksData(userId, answerPdfId);
+
+        if (questionMarksData.marks && questionMarksData.marks.length > 0) {
+          console.log("✅ Marks data already exists, skipping creation");
+
+          // Emit existing data back to client
+          socket.emit("allquestions-data", {
+            success: true,
+            answerPdfId: answerPdfId,
+            marks: questionMarksData.marks,
+            status: "completed",
+          });
+          return;
+        }
+
+        console.log(`🔄 Fetching question definitions for task ${taskId}`);
+
+        // Retrieve the task from database
+        const task = await Task.findById(taskId);
+        if (!task) {
+          throw new Error("Task not found");
+        }
+
+        const subject = await Subject.findOne({ code: task.subjectCode });
+        if (!subject) {
+          throw new Error("Subject not found (create subject)");
+        }
+
+        const courseSchemaDetails = await SubjectSchemaRelation.findOne({
+          subjectId: subject._id,
+        });
+        if (!courseSchemaDetails) {
+          throw new Error("Schema not found for the subject");
+        }
+
+        const schemaDetails = await Schema.findOne({
+          _id: courseSchemaDetails.schemaId,
+        });
+        if (!schemaDetails) {
+          throw new Error("Schema not found");
+        }
+
+        // Fetch all QuestionDefinitions for the schema
+        const questionDefinitions = await QuestionDefinition.find({
+          schemaId: schemaDetails.id,
+        });
+
+        if (!questionDefinitions || questionDefinitions.length === 0) {
+          throw new Error("No QuestionDefinitions found");
+        }
+
+        // Fetch Marks data from database based on the provided answerPdfId
+        const marksData = await Marks.find({ answerPdfId: answerPdfId });
+
+        // Create file data structure
+        const fileData = {
+          marks: [],
+        };
+
+        // Process each question definition and combine with marks data
+        questionDefinitions.forEach((question, index) => {
+          // Find the related Marks entry for the current questionDefinitionId
+          const marks = marksData.find(
+            (m) =>
+              m.questionDefinitionId.toString() === question._id.toString(),
+          );
+
+          // Use marks data if exists, otherwise use defaults
+          const marksInfo = marks
+            ? {
+                allottedMarks: marks.allottedMarks,
+                timerStamps: marks.timerStamps,
+                isMarked: marks.isMarked,
+              }
+            : {
+                allottedMarks: 0,
+                timerStamps: "",
+                isMarked: false,
+              };
+
+          const marksDataObj = {
+            _id: question._id.toString(),
+            schemaId: question.schemaId,
+            parentQuestionId: question.parentQuestionId || null,
+            questionsName: question.questionsName,
+            maxMarks: question.maxMarks || 10,
+            minMarks: question.minMarks || 0,
+            isSubQuestion: question.isSubQuestion || false,
+            bonusMarks: question.bonusMarks || 0,
+            marksDifference: question.marksDifference || 1,
+            numberOfSubQuestions: question.numberOfSubQuestions || 0,
+            compulsorySubQuestions: question.compulsorySubQuestions || 0,
+            __v: question.__v || 0,
+            allottedMarks: marksInfo.allottedMarks,
+            answerPdfId: answerPdfId,
+            timerStamps: marksInfo.timerStamps,
+            isMarked: marksInfo.isMarked,
+            updatedAt: new Date().toISOString(),
+          };
+
+          fileData.marks.push(marksDataObj);
+          console.log(
+            `✅ Processed question ${index + 1}: ${marksDataObj.questionsName}`,
+          );
+        });
+
+        // Save to local file
+        saveMarksData(userId, answerPdfId, fileData);
+        console.log(
+          `✅ Saved ${fileData.marks.length} questions to local file`,
+        );
+
+        // Emit back to the socket
+        socket.emit("questions-data", {
+          success: true,
+          answerPdfId: answerPdfId,
+          marks: fileData.marks,
+          status: "completed",
+        });
+      } catch (error) {
+        console.error("Error in get-questions:", error);
+        socket.emit("error", {
+          success: false,
+          message: error.message,
+        });
+      }
+    });
+
+    socket.on("get-marks-data", async (data) => {
+      try {
+        const { taskId, userId, answerPdfId } = data;
+
+        const marksDataFile = loadMarksData(userId, answerPdfId);
+        const marksFile = loadMarks(userId, answerPdfId);
+
+        socket.emit("final-marks-data", {
+          marks: marksFile.marks || [],
+          marksData: marksDataFile.marks || [],
+        });
+      } catch (error) {
+        
+        console.error("Error in get-marks-data:", error);
+
+
+
+        socket.emit("error", {
+          success: false,
+          message: error.message,
+        });
+      }
+    });
+
     socket.on("leave-room", ({ taskId }) => {
       const roomName = `task_${taskId}`;
       socket.leave(roomName);
       console.log(`🔴 Client ${socket.id} left room: ${roomName}`);
     });
+
+  const emitMarksUpdate = (io, taskId, userId, answerPdfId) => {
+  const marksDataFile = loadMarksData(userId, answerPdfId);
+  const marksFile = loadMarks(userId, answerPdfId);
+
+  io.to(`task_${taskId}`).emit("updated-marks-data", {
+    marks: marksFile.marks || [],
+    marksData: marksDataFile.marks || [],
+  });
+};
 
     socket.on("disconnect", (reason) => {
       console.log("🔴 Client disconnected:", socket.id, "Reason:", reason);

@@ -208,7 +208,7 @@ const updateSchema = async (req, res) => {
     });
 
     parentQuestions.sort(
-      (a, b) => Number(a.questionsName) - Number(b.questionsName)
+      (a, b) => Number(a.questionsName) - Number(b.questionsName),
     );
 
     const existingParentCount = parentQuestions.length;
@@ -226,7 +226,7 @@ const updateSchema = async (req, res) => {
         ],
       });
       console.log(
-        `Deleted ${parentsToDelete.length} parent questions and their sub-questions.`
+        `Deleted ${parentsToDelete.length} parent questions and their sub-questions.`,
       );
     }
 
@@ -358,7 +358,7 @@ const uploadSupplimentaryPdf = async (req, res) => {
     const extractedImagesDir = path.join(
       baseDir,
       "extractedSupplimentaryPdfImages",
-      schemaId
+      schemaId,
     );
 
     fs.mkdirSync(supplimentaryPdfDir, { recursive: true });
@@ -391,7 +391,7 @@ const uploadSupplimentaryPdf = async (req, res) => {
       try {
         const images = await extractImagesFromPdf(
           finalPdfPath,
-          extractedImagesDir
+          extractedImagesDir,
         );
 
         await Schema.findByIdAndUpdate(schemaId, {
@@ -524,26 +524,25 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
   try {
     if (!coordination || !coordination.type || !coordination.areas) {
       return res.status(400).json({
-        message: "coordination.type and coordination.areas are required"
+        message: "coordination.type and coordination.areas are required",
       });
     }
     const schemaidd = new mongoose.Types.ObjectId(schemaId);
 
     const schema = await Schema.findById(schemaidd);
-     if(!schema){
+    if (!schema) {
       return res.status(404).json({ message: "Schema not found" });
-     }
+    }
 
-     
+    const existingType =
+      schema.supplementaryPages.length > 0
+        ? schema.supplementaryPages[0].type
+        : null;
 
-     const existingType = schema.supplementaryPages.length > 0 ? schema.supplementaryPages[0].type : null;
-
-      if (existingType && existingType !== coordination.type) {
+    if (existingType && existingType !== coordination.type) {
       // 🔥 DELETE EVERYTHING
       schema.supplementaryPages = [];
     }
-
-    
 
     const updates = [];
 
@@ -551,15 +550,15 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
     if (coordination.type === "WHOLE_PAGE") {
       if (!Array.isArray(coordination.areas)) {
         return res.status(400).json({
-          message: "areas must be an array of page numbers"
+          message: "areas must be an array of page numbers",
         });
       }
 
-      coordination.areas.forEach(pageNumber => {
+      coordination.areas.forEach((pageNumber) => {
         updates.push({
           pageNumber,
           type: "WHOLE_PAGE",
-          coordinates: []
+          coordinates: [],
         });
       });
     }
@@ -570,24 +569,20 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
         updates.push({
           pageNumber: Number(page),
           type: "PARTIAL_PAGE",
-          coordinates: coords
+          coordinates: coords,
         });
       });
     }
 
-    
-
     //  UPSERT IN MEMORY
     for (const page of updates) {
       const index = schema.supplementaryPages.findIndex(
-        p => p.pageNumber === page.pageNumber
+        (p) => p.pageNumber === page.pageNumber,
       );
 
-      if (index !== -1  ) {
-        
-          schema.supplementaryPages[index].coordinates = page.coordinates;
-
-     } else {
+      if (index !== -1) {
+        schema.supplementaryPages[index].coordinates = page.coordinates;
+      } else {
         // insert
 
         schema.supplementaryPages.push(page);
@@ -598,18 +593,15 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
 
     res.status(200).json({
       message: "Supplementary coordination saved successfully",
-      data: schema
+      data: schema,
     });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({
-      message: "Failed to save supplementary coordination"
+      message: "Failed to save supplementary coordination",
     });
   }
 };
-
-
 
 export {
   createSchema,

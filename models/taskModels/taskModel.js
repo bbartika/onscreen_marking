@@ -10,6 +10,11 @@ const taskSchema = new mongoose.Schema({
         ref: "User",
         required: true
     },
+    questiondefinitionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "QuestionDefinition",
+        required: true  
+    },
     totalBooklets: {
         type: Number,
         required: true
