@@ -4,6 +4,7 @@ import SubjectFolderModel from "../../models/StudentModels/subjectFolderModel.js
 import { isValidObjectId } from "../../services/mongoIdValidation.js";
 import CourseSchemaRelation from "../../models/subjectSchemaRelationModel/subjectSchemaRelationModel.js";
 import CoordinateAllocation from "../../models/subjectSchemaRelationModel/coordinateAllocationModel.js";
+import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchema.js";
 import Schema from "../../models/schemeModel/schema.js";
 import fs from "fs";
 import path from "path";
@@ -417,6 +418,163 @@ const getAllSubjectBasedOnClassId = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
+/* -------------------------------------------------------------------------- */
+/*                           Getting The Questions By Subject                    */
+/* -------------------------------------------------------------------------- */
+
+const getQuestionsBySubjectFolder = async (req, res) => {
+  try {
+    const { folderName } = req.params;
+
+    if (!folderName) {
+      return res.status(400).json({
+        message: "folderName is required",
+      });
+    }
+
+    /* --------------------------------
+       1️⃣ SUBJECT FOLDER → SUBJECT
+=======
+import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchema.js";
+
+
+/* -------------------------------------------------------------------------- */
+/*                         Getting The Questions By Subject                    */
+/* -------------------------------------------------------------------------- */
+
+const getQuestionsBySubjectFolder = async (req, res) => {
+try {
+    const { folderName } = req.params;
+
+    if (!folderName) {
+     return res.status(400).json({
+        message: "folderName is required",
+     });
+    }
+
+    /* --------------------------------
+     1️⃣ SUBJECT FOLDER → SUBJECT
+>>>>>>> d4c66b8caa643ddb87a17c17fe9afd8cde5bf74a
+    -------------------------------- */
+    const subject = await Subject.findOne({ code: folderName }).lean();
+
+    if (!subject) {
+<<<<<<< HEAD
+      return res.status(404).json({
+        message: `No subject found for folder '${folderName}'`,
+      });
+    }
+
+    /* --------------------------------
+       2️⃣ SUBJECT → SCHEMA RELATION
+    -------------------------------- */
+    const schemaRelation = await CourseSchemaRelation.findOne({
+      subjectId: subject._id,
+    }).lean();
+
+    if (!schemaRelation) {
+      return res.status(404).json({
+        message: "No schema mapped to this subject",
+      });
+=======
+     return res.status(404).json({
+        message: `No subject found for folder '${folderName}'`,
+     });
+    }
+
+    /* --------------------------------
+     2️⃣ SUBJECT → SCHEMA RELATION
+    -------------------------------- */
+    const schemaRelation = await CourseSchemaRelation.findOne({
+     subjectId: subject._id,
+    }).lean();
+
+    if (!schemaRelation) {
+     return res.status(404).json({
+        message: "No schema mapped to this subject",
+     });
+>>>>>>> d4c66b8caa643ddb87a17c17fe9afd8cde5bf74a
+    }
+
+    const schemaId = schemaRelation.schemaId;
+
+    /* --------------------------------
+<<<<<<< HEAD
+       3️⃣ SCHEMA → QUESTIONS
+    -------------------------------- */
+    const questions = await QuestionDefinition.find({
+      schemaId: schemaId,
+    })
+      .sort({ questionsName: 1 }) // keeps order
+      .lean();
+
+    if (!questions || questions.length === 0) {
+      return res.status(404).json({
+        message: "No questions found for this schema",
+      });
+    }
+
+    /* --------------------------------
+       RESPONSE
+    -------------------------------- */
+    return res.status(200).json({
+      subject: {
+        id: subject._id,
+        name: subject.name,
+        code: subject.code,
+      },
+      schemaId,
+      totalQuestions: questions.length,
+      questions,
+    });
+  } catch (error) {
+    console.error("getQuestionsBySubjectFolder error:", error);
+    return res.status(500).json({
+      message: "Failed to fetch questions",
+    });
+  }
+};
+
+=======
+     3️⃣ SCHEMA → QUESTIONS
+    -------------------------------- */
+    const questions = await QuestionDefinition.find({
+     schemaId: schemaId,
+    })
+     .sort({ questionsName: 1 }) // keeps order
+     .lean();
+
+    if (!questions || questions.length === 0) {
+     return res.status(404).json({
+        message: "No questions found for this schema",
+     });
+    }
+
+    /* --------------------------------
+     RESPONSE
+    -------------------------------- */
+    return res.status(200).json({
+     subject: {
+        id: subject._id,
+        name: subject.name,
+        code: subject.code,
+     },
+     schemaId,
+     totalQuestions: questions.length,
+     questions,
+    });
+} catch (error) {
+    console.error("getQuestionsBySubjectFolder error:", error);
+    return res.status(500).json({
+     message: "Failed to fetch questions",
+    });
+}
+};
+
+
+
+>>>>>>> d4c66b8caa643ddb87a17c17fe9afd8cde5bf74a
 export {
   createSubject,
   removeSubject,
@@ -425,4 +583,9 @@ export {
   updateSubject,
   getAllSubjectBasedOnClassId,
   subjectsWithTasks,
+<<<<<<< HEAD
+  getQuestionsBySubjectFolder,
+=======
+  getQuestionsBySubjectFolder
+>>>>>>> d4c66b8caa643ddb87a17c17fe9afd8cde5bf74a
 };

@@ -9,7 +9,8 @@ import UserLoginLog from "../../models/authModels/UserLoginLog.js";
 import crypto from "crypto";
 import redisClient from "../../services/redisClient.js";
 import convertJSONToCSV from "../../services/jsonToCsv.js";
-import sendEmail from "../../utils/sendEmail.js";
+import { sendEmailSignup, sendEmailSendotp, sendEmailResetpassword }   from "../../utils/sendEmail.js";
+ 
 import { saveOtp, getOtp, deleteOtp } from "../../utils/otpStore.js";
 import mongoose from "mongoose";
 
@@ -54,7 +55,7 @@ const createUser = async (req, res) => {
   // const otpCode = Math.floor(100000 + Math.random() * 900000).toString(); 
 
   if (password) {
-    await sendEmail(
+    await sendEmailSignup(
       email,
       `The password you created for the Onscreen Marking site is "${password}". Please keep it confidential.`
     );
@@ -679,7 +680,7 @@ const otpSend = async (req, res) => {
 
     saveOtp(email, hashedOtp, OTP_TTL);
 
-    await sendEmail(email, `Your OTP is ${otp}. It will expire in 5 minutes.`);
+    await sendEmailSendotp(email, `Your OTP is ${otp}. It will expire in 5 minutes.`);
 
     res.json({ message: "OTP sent successfully" });
   } catch (error) {
@@ -751,6 +752,8 @@ const passwordReset = async (req, res) => {
     user.password = await bcrypt.hash(password, salt);
     await user.save();
     console.log("user is saved");
+
+    await sendEmailResetpassword(email, `Your reset password for onscrreen-marking site is ${password}.`);
 
     // 🔐 close the door
 

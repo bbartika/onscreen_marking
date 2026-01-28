@@ -1,10 +1,10 @@
 import express from "express";
 const router = express.Router();
 
-import { createSchema, updateSchema, getAllSchemas,getSchemaById, removeSchema, getAllCompletedSchema, getSchemadetailsById, uploadSupplimentaryPdf, getcoordinateSupplimentarypdf } from "../../controllers/schemeControllers/schemaControllers.js";
+import { createSchema, updateSchema, getAllSchemas,getSchemaById, removeSchema, getAllCompletedSchema, getSchemadetailsById, uploadSupplimentaryPdf, getcoordinateSupplimentarypdf, uploadAnswerPdf, getAnswerPdfImages, serveAnswerPdfImage } from "../../controllers/schemeControllers/schemaControllers.js";
 import authMiddleware from "../../Middlewares/authMiddleware.js";
 
-
+import uploadAnswerPdfMiddleware from "../../Middlewares/uploadAnswerPdfMiddleware.js";
 import  uploadSupplimentaryPdfMiddleware  from "../../Middlewares/uploadSupplimentaryMiddleware.js";
 
 /* -------------------------------------------------------------------------- */
@@ -19,7 +19,8 @@ router.get("/getall/schema", getAllSchemas);
 router.get("/getall/completed/schema", authMiddleware, getAllCompletedSchema);
 
 
-
+router.post("/uploadAnswerPdf/:schemaId", authMiddleware, uploadAnswerPdfMiddleware, uploadAnswerPdf);
+router.get("/get/answer-pdf-images/:schemaId/:imageName", serveAnswerPdfImage);
 router.get("/getschemadetailsbyid/:id", getSchemadetailsById);
 router.post("/uploadSupplimentarypdf/:schemaId", authMiddleware, uploadSupplimentaryPdfMiddleware, uploadSupplimentaryPdf);
 

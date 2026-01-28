@@ -16,7 +16,9 @@ import {
     getAllTasksBasedOnSubjectCode,
     completedBookletHandler,
     checkTaskCompletionHandler,
+    editTaskHandler,
     autoAssigning,
+    rejectBooklet
     // generatePdfForCompletedBooklet
 } from "../../controllers/taskControllers/taskControllers.js";
 
@@ -33,6 +35,7 @@ router.get("/user/task-status/:userId", getUserCurrentTaskStatus);
 router.post("/reassign/booklets", reassignBooklets);    
 // router.get("/pause/task/:id", pauseTask);
 // router.put("/update/task/:id", updateAssignedTask);
+router.put("/edit/task/:taskId", editTaskHandler);
 router.put("/update/task/currentIndex/:id", updateCurrentIndex);
 router.delete("/remove/task/:id", removeAssignedTask);
 router.get("/get/all/tasks", getAllTaskHandler);
@@ -40,6 +43,7 @@ router.get("/get/task/:id", getAssignTaskById);
 router.get("/get/questiondefinition", getQuestionDefinitionTaskId);
 router.get("/getall/tasks/:userId", getAllAssignedTaskByUserId);
 router.get("/subjectcode", getAllTasksBasedOnSubjectCode);
+router.post("/rejectbooklet/:answerPdfId", rejectBooklet);
 router.put("/completedbooklet/:answerpdfid/:userId", completedBookletHandler);
 
 // router.post("/completeBooklet/generatePdf/:answerPdfId", generatePdfForCompletedBooklet);

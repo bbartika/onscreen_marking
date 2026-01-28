@@ -1,10 +1,16 @@
 import Schema from "../../models/schemeModel/schema.js";
 import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchema.js";
+import SchemaAnswerPdf from "../../models/schemeModel/answerPdfModel.js";
 import extractImagesFromPdf from "../../services/extractImagesFromPdf.js";
 import mongoose from "mongoose";
 
 import path from "path";
 import fs from "fs";
+
+import unzipper from "unzipper";
+import stream from "stream";
+import { promisify } from "util";
+
 /* -------------------------------------------------------------------------- */
 /*                           CREATE SCHEMA                                    */
 /* -------------------------------------------------------------------------- */
@@ -22,6 +28,7 @@ const createSchema = async (req, res) => {
     hiddenPage,
     numberOfSupplement,
     PageofSupplement,
+    perPage,
   } = req.body;
 
   try {
@@ -33,7 +40,8 @@ const createSchema = async (req, res) => {
       !minTime ||
       !maxTime ||
       !numberOfPage ||
-      !hiddenPage
+      !hiddenPage ||
+      !perPage  
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -42,6 +50,11 @@ const createSchema = async (req, res) => {
       return res
         .status(400)
         .json({ message: "Total questions must be greater than 0" });
+    }
+    if (Number(perPage) <= 0) {
+      return res.status(400).json({
+        message: "Timer minutes must be greater than 0",
+      });
     }
     if (Number(maxMarks) <= 0) {
       return res
@@ -79,6 +92,7 @@ const createSchema = async (req, res) => {
     const newSchema = new Schema({
       name,
       totalQuestions,
+      perPage,
       maxMarks,
       minMarks,
       minTime,
@@ -122,7 +136,8 @@ const updateSchema = async (req, res) => {
     numberOfPage,
     hiddenPage,
     numberOfSupplement,
-    PageofSupplement,
+    PageofSupplement,    
+    perPage,
   } = req.body;
 
   console.log("Update schema called with:", {
@@ -139,6 +154,7 @@ const updateSchema = async (req, res) => {
     hiddenPage,
     numberOfSupplement,
     PageofSupplement,
+    perPage,
   });
 
   try {
@@ -151,7 +167,8 @@ const updateSchema = async (req, res) => {
       !minTime ||
       !maxTime ||
       !numberOfPage ||
-      !hiddenPage
+      !hiddenPage||
+      !perPage 
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -161,6 +178,11 @@ const updateSchema = async (req, res) => {
       return res
         .status(400)
         .json({ message: "Total questions must be greater than 0" });
+    }
+    if (Number(perPage) <= 0) {
+      return res.status(400).json({
+        message: "Timer minutes must be greater than 0",
+      });
     }
     if (Number(maxMarks) <= 0) {
       return res
@@ -208,7 +230,7 @@ const updateSchema = async (req, res) => {
     });
 
     parentQuestions.sort(
-      (a, b) => Number(a.questionsName) - Number(b.questionsName)
+      (a, b) => Number(a.questionsName) - Number(b.questionsName),
     );
 
     const existingParentCount = parentQuestions.length;
@@ -226,12 +248,13 @@ const updateSchema = async (req, res) => {
         ],
       });
       console.log(
-        `Deleted ${parentsToDelete.length} parent questions and their sub-questions.`
+        `Deleted ${parentsToDelete.length} parent questions and their sub-questions.`,
       );
     }
 
     schema.name = name;
     schema.totalQuestions = totalQuestions;
+    schema.perPage = perPage;
     schema.maxMarks = maxMarks;
     schema.minMarks = minMarks;
     schema.minTime = minTime;
@@ -358,7 +381,7 @@ const uploadSupplimentaryPdf = async (req, res) => {
     const extractedImagesDir = path.join(
       baseDir,
       "extractedSupplimentaryPdfImages",
-      schemaId
+      schemaId,
     );
 
     fs.mkdirSync(supplimentaryPdfDir, { recursive: true });
@@ -391,7 +414,7 @@ const uploadSupplimentaryPdf = async (req, res) => {
       try {
         const images = await extractImagesFromPdf(
           finalPdfPath,
-          extractedImagesDir
+          extractedImagesDir,
         );
 
         await Schema.findByIdAndUpdate(schemaId, {
@@ -524,18 +547,25 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
   try {
     if (!coordination || !coordination.type || !coordination.areas) {
       return res.status(400).json({
-        message: "coordination.type and coordination.areas are required"
+        message: "coordination.type and coordination.areas are required",
       });
     }
     const schemaidd = new mongoose.Types.ObjectId(schemaId);
 
     const schema = await Schema.findById(schemaidd);
-     if(!schema){
+    if (!schema) {
       return res.status(404).json({ message: "Schema not found" });
-     }
+    }
 
+    const existingType =
+      schema.supplementaryPages.length > 0
+        ? schema.supplementaryPages[0].type
+        : null;
 
-    
+    if (existingType && existingType !== coordination.type) {
+      // 🔥 DELETE EVERYTHING
+      schema.supplementaryPages = [];
+    }
 
     const updates = [];
 
@@ -543,15 +573,15 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
     if (coordination.type === "WHOLE_PAGE") {
       if (!Array.isArray(coordination.areas)) {
         return res.status(400).json({
-          message: "areas must be an array of page numbers"
+          message: "areas must be an array of page numbers",
         });
       }
 
-      coordination.areas.forEach(pageNumber => {
+      coordination.areas.forEach((pageNumber) => {
         updates.push({
           pageNumber,
           type: "WHOLE_PAGE",
-          coordinates: []
+          coordinates: [],
         });
       });
     }
@@ -562,7 +592,7 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
         updates.push({
           pageNumber: Number(page),
           type: "PARTIAL_PAGE",
-          coordinates: coords
+          coordinates: coords,
         });
       });
     }
@@ -570,15 +600,14 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
     //  UPSERT IN MEMORY
     for (const page of updates) {
       const index = schema.supplementaryPages.findIndex(
-        p => p.pageNumber === page.pageNumber
+        (p) => p.pageNumber === page.pageNumber,
       );
 
       if (index !== -1) {
-        // update
-        schema.supplementaryPages[index].type = page.type;
         schema.supplementaryPages[index].coordinates = page.coordinates;
       } else {
         // insert
+
         schema.supplementaryPages.push(page);
       }
     }
@@ -587,19 +616,199 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
 
     res.status(200).json({
       message: "Supplementary coordination saved successfully",
-      data: schema
+      data: schema,
     });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({
-      message: "Failed to save supplementary coordination"
+      message: "Failed to save supplementary coordination",
+    });
+  }
+};
+
+<<<<<<< HEAD
+/* -------------------------------------------------------------------------- */
+/*                           New PDF Upload Pipeline                          */
+/* -------------------------------------------------------------------------- */
+
+const pipeline = promisify(stream.pipeline);
+
+const uploadAnswerPdf = async (req, res) => {
+  try {
+    const { schemaId } = req.params;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const schema = await Schema.findById(schemaId);
+    if (!schema) {
+      return res.status(404).json({ message: "Schema not found" });
+    }
+
+    /* ================================
+       GENERATE UNIQUE PDF ID
+    ================================= */
+    const answerPdfId = new mongoose.Types.ObjectId();
+
+    /* ================================
+       DIRECTORY SETUP (LIKE SUPPLEMENTARY)
+    ================================= */
+    const baseDir = path.resolve(process.cwd(), "uploadedPdfs");
+
+    const answerPdfDir = path.join(baseDir, "answer-pdfs");
+    const extractedImagesDir = path.join(
+      baseDir,
+      "extractedAnswerPdfImages",
+      schemaId.toString()
+    );
+
+    fs.mkdirSync(answerPdfDir, { recursive: true });
+    fs.mkdirSync(extractedImagesDir, { recursive: true });
+
+    /* ================================
+       MOVE PDF
+    ================================= */
+    const finalPdfPath = path.join(
+      answerPdfDir,
+      `${answerPdfId}.pdf`
+    );
+
+    await fs.promises.rename(file.path, finalPdfPath);
+
+    /* ================================
+       STORE DB RECORD
+    ================================= */
+    await SchemaAnswerPdf.create({
+      _id: answerPdfId,
+      schemaId,
+      fileName: file.originalname,
+      filePath: `answer-pdfs/${answerPdfId}.pdf`,
+      fileSize: file.size,
+      uploadType: "DIRECT_PDF",
+      uploadedBy: req.user._id,
+    });
+
+    res.status(200).json({
+      message: "Answer PDF uploaded. Image extraction started.",
+      answerPdfId,
+    });
+
+    /* ================================
+       BACKGROUND IMAGE EXTRACTION
+    ================================= */
+    setImmediate(async () => {
+      try {
+        const images = await extractImagesFromPdf(
+          finalPdfPath,
+          extractedImagesDir
+        );
+
+        // OPTIONAL: store image count later if needed
+        // await SchemaAnswerPdf.findByIdAndUpdate(answerPdfId, {
+        //   imageCount: images.length
+        // });
+
+      } catch (err) {
+        console.error("Answer PDF image extraction failed:", err);
+      }
+    });
+
+  } catch (error) {
+    console.error("uploadAnswerPdf error:", error);
+    return res.status(500).json({
+      message: "Failed to upload answer PDF",
     });
   }
 };
 
 
+/* -------------------------------------------------------------------------- */
+/*               New PDF Upload Pipeline Fetch Pipeline                       */
+/* -------------------------------------------------------------------------- */
 
+const getAnswerPdfImages = async (req, res) => {
+  try {
+    const { answerPdfId } = req.params;
+
+    if (!answerPdfId) {
+      return res.status(400).json({
+        message: "answerPdfId is required",
+      });
+    }
+
+    const imagesDir = path.join(
+      process.cwd(),
+      "uploadedPdfs",
+      "extractedAnswerPdfImages",
+      answerPdfId
+    );
+
+    if (!fs.existsSync(imagesDir)) {
+      return res.status(404).json({
+        message: "Extracted images not found for this PDF",
+      });
+    }
+
+    const files = fs
+      .readdirSync(imagesDir)
+      .filter((file) => file.toLowerCase().endsWith(".png"))
+      .sort((a, b) => {
+        const numA = parseInt(a.match(/\d+/)?.[0] || 0, 10);
+        const numB = parseInt(b.match(/\d+/)?.[0] || 0, 10);
+        return numA - numB;
+      });
+
+    if (files.length === 0) {
+      return res.status(404).json({
+        message: "No images found for this PDF",
+      });
+    }
+
+    const imageUrls = files.map((file) => ({
+      page: parseInt(file.match(/\d+/)?.[0], 10),
+      imageUrl: `/uploadedPdfs/extractedAnswerPdfImages/${answerPdfId}/${file}`,
+    }));
+
+    return res.status(200).json({
+      answerPdfId,
+      totalPages: imageUrls.length,
+      images: imageUrls,
+    });
+  } catch (error) {
+    console.error("getAnswerPdfImages error:", error);
+    return res.status(500).json({
+      message: "Failed to fetch answer PDF images",
+    });
+  }
+};
+
+const serveAnswerPdfImage = async (req, res) => {
+  try {
+    const { schemaId, imageName } = req.params;
+
+    const imagePath = path.join(
+      process.cwd(),
+      "uploadedPdfs",
+      "extractedAnswerPdfImages",
+      schemaId,
+      imageName
+    );
+
+    if (!fs.existsSync(imagePath)) {
+      return res.status(404).send("Image not found");
+    }
+
+    res.sendFile(imagePath);
+  } catch (err) {
+    res.status(500).send("Failed to load image");
+  }
+};
+
+
+=======
+>>>>>>> d4c66b8caa643ddb87a17c17fe9afd8cde5bf74a
 export {
   createSchema,
   updateSchema,
@@ -610,4 +819,7 @@ export {
   uploadSupplimentaryPdf,
   getSchemadetailsById,
   getcoordinateSupplimentarypdf,
+  uploadAnswerPdf,
+  getAnswerPdfImages,
+  serveAnswerPdfImage,
 };
