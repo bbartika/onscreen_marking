@@ -1060,7 +1060,7 @@ export default function handleAnnotationSocket(io) {
         console.log("📊 Get questions request:", data);
 
         // Expect data to contain taskId and answerPdfId
-        const { taskId, userId, answerPdfId } = data;
+        const { taskId, userId, answerPdfId, questiondefinitionId } = data;
 
         if (answerPdfId === null || answerPdfId === undefined) {
           return { annotations: [], comments: [] };
@@ -1123,11 +1123,11 @@ export default function handleAnnotationSocket(io) {
         }
 
         // Fetch all QuestionDefinitions for the schema
-        const questionDefinitions = await QuestionDefinition.find({
-          schemaId: schemaDetails.id,
+        const questionDefinition = await QuestionDefinition.find({
+          _id: questiondefinitionId,
         });
 
-        if (!questionDefinitions || questionDefinitions.length === 0) {
+        if (!questionDefinition ) {
           throw new Error("No QuestionDefinitions found");
         }
 

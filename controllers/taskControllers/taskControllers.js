@@ -26,7 +26,7 @@ const extractQuestionImages = async (
   coordinates,
   pageImages,
   pageImagesFolder,
-  outputFolder
+  outputFolder,
 ) => {
   if (!fs.existsSync(outputFolder)) {
     fs.mkdirSync(outputFolder, { recursive: true });
@@ -38,14 +38,14 @@ const extractQuestionImages = async (
   if (Array.isArray(coordinates.wholePages)) {
     for (const page of coordinates.wholePages) {
       const pageImage = pageImages[page - 1]; // page is 1-based
-      
+
       if (!pageImage || !pageImage.name) {
         console.warn(`⚠️ Page ${page}: No image found in database`);
         continue;
       }
 
       const sourcePath = path.join(pageImagesFolder, pageImage.name);
-      
+
       // Check if source file exists
       if (!fs.existsSync(sourcePath)) {
         console.error(`❌ Page ${page}: Source not found at ${sourcePath}`);
@@ -58,16 +58,15 @@ const extractQuestionImages = async (
 
       try {
         // Copy entire page image to output folder
-        await sharp(sourcePath)
-          .toFile(outputPath);
+        await sharp(sourcePath).toFile(outputPath);
 
         console.log(`✅ Copied whole page ${page} → ${outputName}`);
 
         results.push({
           type: "whole",
           page,
-          image: outputName,  // ✅ Points to file in outputFolder
-          originalImage: pageImage.name
+          image: outputName, // ✅ Points to file in outputFolder
+          originalImage: pageImage.name,
         });
       } catch (err) {
         console.error(`❌ Failed to copy page ${page}:`, err.message);
@@ -80,14 +79,14 @@ const extractQuestionImages = async (
     for (const [pageStr, areas] of Object.entries(coordinates.partialAreas)) {
       const page = Number(pageStr);
       const pageImage = pageImages[page - 1];
-      
+
       if (!pageImage || !pageImage.name) {
         console.warn(`⚠️ Page ${page}: No image found for partial areas`);
         continue;
       }
 
       const sourcePath = path.join(pageImagesFolder, pageImage.name);
-      
+
       if (!fs.existsSync(sourcePath)) {
         console.error(`❌ Page ${page}: Source not found at ${sourcePath}`);
         continue;
@@ -115,7 +114,9 @@ const extractQuestionImages = async (
             })
             .toFile(outputPath);
 
-          console.log(`✅ Extracted page ${page} area ${i + 1} → ${outputName}`);
+          console.log(
+            `✅ Extracted page ${page} area ${i + 1} → ${outputName}`,
+          );
 
           results.push({
             type: "partial",
@@ -123,10 +124,13 @@ const extractQuestionImages = async (
             areaIndex: i + 1,
             image: outputName,
             coordinates: { x, y, width, height },
-            originalImage: pageImage.name
+            originalImage: pageImage.name,
           });
         } catch (err) {
-          console.error(`❌ Failed to extract page ${page} area ${i + 1}:`, err.message);
+          console.error(
+            `❌ Failed to extract page ${page} area ${i + 1}:`,
+            err.message,
+          );
         }
       }
     }
@@ -135,7 +139,6 @@ const extractQuestionImages = async (
   console.log(`📊 Total question images extracted: ${results.length}`);
   return results;
 };
-
 
 //   coordinates,
 //   pageImages,
@@ -1374,7 +1377,7 @@ const removeAssignedTask = async (req, res) => {
 
 //     // Get assigned PDFs
 //     const assignedPdfs = await AnswerPdf.find({ taskId: task._id });
-    
+
 //     // Update pending PDFs to "progress"
 //     await AnswerPdf.updateMany(
 //       { taskId: task._id, status: "false" },
@@ -1397,8 +1400,8 @@ const removeAssignedTask = async (req, res) => {
 
 //     const pdfPath = path.join(subjectFolder, currentPdf.answerPdfName);
 //     if (!fs.existsSync(pdfPath)) {
-//       return res.status(404).json({ 
-//         message: `PDF file ${currentPdf.answerPdfName} not found.` 
+//       return res.status(404).json({
+//         message: `PDF file ${currentPdf.answerPdfName} not found.`
 //       });
 //     }
 
@@ -1412,10 +1415,10 @@ const removeAssignedTask = async (req, res) => {
 //     // ✅ Build base URL for HTTP access
 //     const baseUrl = `${req.protocol}://${req.get("host")}`;
 //     const bookletName = path.basename(currentPdf.answerPdfName, ".pdf");
-    
+
 //     // ✅ Convert file paths to accessible URLs
 //     // const extractedBookletUrl = `${baseUrl}/api/files/processed/${task.subjectCode}/extractedBooklets/${bookletName}`;
-    
+
 //     const questionImagesFolderUrl = `${baseUrl}/api/files/processed/${task.subjectCode}/extractedBooklets/${bookletName}/questionImages/${task.questiondefinitionId}`;
 
 //     // ✅ Check if images already extracted
@@ -1428,7 +1431,7 @@ const removeAssignedTask = async (req, res) => {
 //     // ✅ If no images, extract them from PDF
 //     if (extractedImages.length === 0) {
 //       console.log("📤 Extracting images from PDF for the first time...");
-      
+
 //       if (!fs.existsSync(currentPdfFolder)) {
 //         fs.mkdirSync(currentPdfFolder, { recursive: true });
 //       }
@@ -1501,9 +1504,9 @@ const removeAssignedTask = async (req, res) => {
 //   } catch (error) {
 //     console.error("❌ Error fetching task:", error.message);
 //     console.error(error.stack);
-//     res.status(500).json({ 
-//       message: "Failed to process task", 
-//       error: error.message 
+//     res.status(500).json({
+//       message: "Failed to process task",
+//       error: error.message
 //     });
 //   }
 // };
@@ -1516,6 +1519,7 @@ const getAssignTaskById = async (req, res) => {
     }
 
     const task = await Task.findById(id);
+
     if (!task) {
       return res.status(404).json({ message: "Task not found." });
     }
@@ -1530,7 +1534,9 @@ const getAssignTaskById = async (req, res) => {
 
     const subject = await Subject.findOne({ code: task.subjectCode });
     if (!subject) {
-      return res.status(404).json({ message: "Subject not found (create subject)." });
+      return res
+        .status(404)
+        .json({ message: "Subject not found (create subject)." });
     }
 
     const courseSchemaRel = await SubjectSchemaRelation.findOne({
@@ -1538,7 +1544,8 @@ const getAssignTaskById = async (req, res) => {
     });
     if (!courseSchemaRel) {
       return res.status(404).json({
-        message: "Schema not found for subject (upload master answer and master question).",
+        message:
+          "Schema not found for subject (upload master answer and master question).",
       });
     }
 
@@ -1558,8 +1565,13 @@ const getAssignTaskById = async (req, res) => {
       task.status = "active";
       await task.save();
     } else if (task.status === "active" && task.lastResumedAt) {
-      const elapsedSeconds = Math.floor((new Date() - task.lastResumedAt) / 1000);
-      remainingSeconds = Math.max((task.remainingTimeInSec ?? maxTime * 60) - elapsedSeconds, 0);
+      const elapsedSeconds = Math.floor(
+        (new Date() - task.lastResumedAt) / 1000,
+      );
+      remainingSeconds = Math.max(
+        (task.remainingTimeInSec ?? maxTime * 60) - elapsedSeconds,
+        0,
+      );
     } else {
       remainingSeconds = maxTime * 60;
     }
@@ -1572,29 +1584,36 @@ const getAssignTaskById = async (req, res) => {
       return res.status(404).json({ message: "Subject folder not found." });
     }
 
-    const extractedBookletsFolder = path.join(subjectFolder, "extractedBooklets");
+    const extractedBookletsFolder = path.join(
+      subjectFolder,
+      "extractedBooklets",
+    );
     if (!fs.existsSync(extractedBookletsFolder)) {
       fs.mkdirSync(extractedBookletsFolder, { recursive: true });
     }
 
     // Get assigned PDFs
     const assignedPdfs = await AnswerPdf.find({ taskId: task._id });
-    
+
     // Update pending PDFs to "progress"
     await AnswerPdf.updateMany(
       { taskId: task._id, status: "false" },
-      { $set: { status: "progress" } }
+      { $set: { status: "progress" } },
     );
 
     if (assignedPdfs.length === 0) {
-      return res.status(404).json({ message: "No PDFs assigned to this task." });
+      return res
+        .status(404)
+        .json({ message: "No PDFs assigned to this task." });
     }
 
     console.log(`📊 TOTAL PDFS ASSIGNED: ${assignedPdfs.length}`);
 
     const currentPdf = assignedPdfs[task.currentFileIndex - 1];
     if (!currentPdf) {
-      return res.status(404).json({ message: "No PDF found for the current file index." });
+      return res
+        .status(404)
+        .json({ message: "No PDF found for the current file index." });
     }
 
     console.log(`📄 CURRENT PDF: ${currentPdf.answerPdfName}`);
@@ -1602,23 +1621,20 @@ const getAssignTaskById = async (req, res) => {
 
     const pdfPath = path.join(subjectFolder, currentPdf.answerPdfName);
     if (!fs.existsSync(pdfPath)) {
-      return res.status(404).json({ 
-        message: `PDF file ${currentPdf.answerPdfName} not found.` 
+      return res.status(404).json({
+        message: `PDF file ${currentPdf.answerPdfName} not found.`,
       });
     }
 
     const bookletName = path.basename(currentPdf.answerPdfName, ".pdf");
-    
-    const currentPdfFolder = path.join(
-      extractedBookletsFolder,
-      bookletName
-    );
+
+    const currentPdfFolder = path.join(extractedBookletsFolder, bookletName);
 
     let extractedBookletPath = `processedFolder/${task.subjectCode}/extractedBooklets/${bookletName}`;
 
     // ✅ Build base URL for HTTP access
     const baseUrl = `${req.protocol}://${req.get("host")}`;
-    
+
     const questionImagesFolderUrl = `processedFolder/${task.subjectCode}/extractedBooklets/${bookletName}/questionImages/${task.questiondefinitionId}`;
 
     // ✅ Check if images already extracted
@@ -1626,26 +1642,69 @@ const getAssignTaskById = async (req, res) => {
       answerPdfId: currentPdf._id,
     });
 
-    console.log(`🖼️ EXISTING EXTRACTED IMAGES IN DATABASE: ${extractedImages.length}`);
+    console.log(
+      `🖼️ EXISTING EXTRACTED IMAGES IN DATABASE: ${extractedImages.length}`,
+    );
+    const questionDef = await QuestionDefinition.findById(
+      task.questiondefinitionId,
+    );
+
+    const questionPages = new Set(questionDef.page);
+    console.log("questionPages", questionPages);
 
     // ✅ If no images, extract them from PDF
     if (extractedImages.length === 0) {
       console.log("📤 Extracting images from PDF for the first time...");
-      
+
       if (!fs.existsSync(currentPdfFolder)) {
         fs.mkdirSync(currentPdfFolder, { recursive: true });
       }
 
       const imageFiles = await extractImagesFromPdf(pdfPath, currentPdfFolder);
 
-      const imageDocs = imageFiles.map((imageFileName, i) => ({
+      // 1️⃣ Check existence
+      const alreadyExists = await AnswerPdfImage.exists({
         answerPdfId: currentPdf._id,
-        name: imageFileName,
-        status: i === 0 ? "visited" : "notVisited",
-      }));
+        questiondefinitionId: questionDef._id,
+      });
+
+      if (alreadyExists) {
+        console.log("ℹ️ Skipping insert — images already exist");
+        return;
+      }
+
+      const imageDocs = imageFiles
+        .map((imageFileName) => {
+          const match = imageFileName.match(/(\d+)/);
+          if (!match) return null;
+
+          const pageNumber = parseInt(match[1], 10);
+          if (!questionPages.has(pageNumber)) return null;
+
+          return {
+            answerPdfId: currentPdf._id,
+            questiondefinitionId: questionDef._id,
+
+            name: imageFileName,
+            status: "notVisited",
+          };
+        })
+        .filter(Boolean);
 
       extractedImages = await AnswerPdfImage.insertMany(imageDocs);
-      console.log(`✅ Extracted ${extractedImages.length} images from PDF`);
+
+      console.log(`✅ Inserted ${extractedImages.length} question images`);
+
+      // const imageDocs = imageFiles.map((imageFileName, ) => ({
+      //   answerPdfId: currentPdf._id,
+      //   questionDef,
+
+      //   name: imageFileName,
+      //   status: i === 0 ? "visited" : "notVisited",
+      // }));
+
+      // extractedImages = await AnswerPdfImage.insertMany(imageDocs);
+      // console.log(`✅ Extracted ${extractedImages.length} images from PDF`);
     }
 
     // ✅ Validate questionDefinitionId
@@ -1658,7 +1717,6 @@ const getAssignTaskById = async (req, res) => {
     console.log("questionDefinitionId:", task.questiondefinitionId.toString());
 
     // ✅ Get question definition
-    const questionDef = await QuestionDefinition.findById(task.questiondefinitionId);
 
     if (!questionDef || !questionDef.coordinates) {
       return res.status(404).json({
@@ -1666,30 +1724,33 @@ const getAssignTaskById = async (req, res) => {
       });
     }
 
-    console.log("Question coordinates:", JSON.stringify(questionDef.coordinates, null, 2));
+    console.log(
+      "Question coordinates:",
+      JSON.stringify(questionDef.coordinates, null, 2),
+    );
 
     // ✅ Extract question images
     const questionImagesFolder = path.join(
       currentPdfFolder,
       "questionImages",
-      String(task.questiondefinitionId)
+      String(task.questiondefinitionId),
     );
 
     console.log("📁 Question images output folder:", questionImagesFolder);
 
     const questionImages = await extractQuestionImages(
-      questionDef.coordinates,   // wholePages + partialAreas
-      extractedImages,           // page images from DB
-      currentPdfFolder,          // source folder
-      questionImagesFolder       // output folder
+      questionDef.coordinates, // wholePages + partialAreas
+      extractedImages, // page images from DB
+      currentPdfFolder, // source folder
+      questionImagesFolder, // output folder
     );
 
     console.log(`✅ Question images extracted: ${questionImages.length}`);
 
     // ✅ ADD URLs TO EACH QUESTION IMAGE
-    const questionImagesWithUrls = questionImages.map(img => ({
+    const questionImagesWithUrls = questionImages.map((img) => ({
       ...img,
-      url: `${questionImagesFolderUrl}/${img.image}`
+      url: `${questionImagesFolderUrl}/${img.image}`,
     }));
 
     // ✅ Return response with question images
@@ -1701,16 +1762,15 @@ const getAssignTaskById = async (req, res) => {
       schemaDetails,
       extractedBookletPath,
       questionImagesPath: `${extractedBookletPath}/questionImages/${task.questiondefinitionId}`,
-      questionImagesFolderUrl,  // ✅ Folder URL
-      questionImages: questionImagesWithUrls,  // ✅ Images with individual URLs
+      questionImagesFolderUrl, // ✅ Folder URL
+      questionImages: questionImagesWithUrls, // ✅ Images with individual URLs
     });
-
   } catch (error) {
     console.error("❌ Error fetching task:", error.message);
     console.error(error.stack);
-    res.status(500).json({ 
-      message: "Failed to process task", 
-      error: error.message 
+    res.status(500).json({
+      message: "Failed to process task",
+      error: error.message,
     });
   }
 };

@@ -81,11 +81,21 @@ const getAnswerPdfImages = async (req, res) => {
     // const hiddenPages = schemaDetails.hiddenPage || [];
     
 
-    const visibleImages = answerPdfImages.filter(
-        (_, index) => !schemaDetails.hiddenPage?.includes(index)
-      )
+    // const visibleImages = answerPdfImages.filter(
+    //     (_, index) => !schemaDetails.hiddenPage?.includes(index)
+    //   )
 
     // Get schema details for hidden pages configuration
+
+    const visibleImages = await AnswerPdfImage.find(
+  {
+    answerPdfId: answerPdfId,
+    questiondefinitionId: task.questiondefinitionId,
+  },
+  { name: 1, status: 1, _id: 0 }
+);
+
+console.log("visibleImages", visibleImages);
 
     
 
