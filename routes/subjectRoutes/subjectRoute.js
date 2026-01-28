@@ -20,6 +20,7 @@ import authMiddleware from "../../Middlewares/authMiddleware.js";
 router.post("/create/subject", authMiddleware, createSubject);
 router.put("/update/subject/:id", authMiddleware, updateSubject);
 router.delete("/remove/subject/:id", authMiddleware, removeSubject);
+router.get("/get/questions-by-folder/:folderName", authMiddleware, getQuestionsBySubjectFolder);
 router.get("/getbyid/subject/:id", authMiddleware, getSubjectById);
 router.get("/getall/subject", authMiddleware, getAllSubjects);
 router.get("/getallsubjectbasedonclass/:classId", authMiddleware, getAllSubjectBasedOnClassId);

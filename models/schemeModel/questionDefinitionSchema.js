@@ -99,7 +99,7 @@ const questionDefinitionSchema = new mongoose.Schema({
         required: true,
     },
     page: {
-        type: [Number], // array of page numbers
+        type: [Number],   // array of page numbers
         required: true,
         default: [],
     },
