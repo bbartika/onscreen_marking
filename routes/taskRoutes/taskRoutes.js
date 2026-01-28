@@ -16,6 +16,7 @@ import {
     getAllTasksBasedOnSubjectCode,
     completedBookletHandler,
     checkTaskCompletionHandler,
+    editTaskHandler,
     autoAssigning,
     rejectBooklet
     // generatePdfForCompletedBooklet
@@ -34,6 +35,7 @@ router.get("/user/task-status/:userId", getUserCurrentTaskStatus);
 router.post("/reassign/booklets", reassignBooklets);    
 // router.get("/pause/task/:id", pauseTask);
 // router.put("/update/task/:id", updateAssignedTask);
+router.put("/edit/task/:taskId", editTaskHandler);
 router.put("/update/task/currentIndex/:id", updateCurrentIndex);
 router.delete("/remove/task/:id", removeAssignedTask);
 router.get("/get/all/tasks", getAllTaskHandler);

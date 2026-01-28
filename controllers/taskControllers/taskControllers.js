@@ -704,6 +704,162 @@ const reassignBooklets = async (req, res) => {
   }
 };
 
+const editTaskHandler = async (req, res) => {
+  const { taskId } = req.params;
+
+  if (!isValidObjectId(taskId)) {
+    return res.status(400).json({ message: "Invalid taskId" });
+  }
+
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    // 1️⃣ Fetch task
+    const task = await Task.findById(taskId).session(session);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    // 2️⃣ Frontend sends FULL task payload → derive intent
+    const newTotal = Number(req.body.totalBooklets);
+    const oldTotal = task.totalBooklets;
+
+    if (!newTotal || newTotal <= 0) {
+      return res.status(400).json({
+        message: "totalBooklets must be greater than 0",
+      });
+    }
+
+    const diff = newTotal - oldTotal;
+    let allocate = 0;
+    let unallocate = 0;
+
+    if (diff > 0) allocate = diff;
+    if (diff < 0) unallocate = Math.abs(diff);
+
+    /* =====================================================
+       🔻 UN-ALLOCATE BOOKLETS
+    ===================================================== */
+    if (unallocate > 0) {
+      // Only pending / progress booklets can be removed
+      const removable = await AnswerPdf.find({
+        taskId,
+        status: { $in: ["false", "progress"] },
+      })
+        .limit(unallocate)
+        .session(session);
+
+      if (removable.length < unallocate) {
+        return res.status(400).json({
+          message: "Not enough pending/progress booklets to unallocate",
+        });
+      }
+
+      const removeIds = removable.map((b) => b._id);
+
+      // Delete AnswerPdf entries
+      await AnswerPdf.deleteMany({ _id: { $in: removeIds } }, { session });
+
+      // Update task count
+      task.totalBooklets -= removeIds.length;
+
+      // 🔁 Update SubjectFolderModel counts
+      await SubjectFolderModel.updateOne(
+        { folderName: task.subjectCode },
+        {
+          $inc: {
+            allocated: -removeIds.length,
+            unAllocated: removeIds.length,
+          },
+          $set: { updatedAt: new Date() },
+        },
+        { session },
+      );
+    }
+
+    /* =====================================================
+       🔺 ALLOCATE BOOKLETS
+    ===================================================== */
+    if (allocate > 0) {
+      const subjectFolderPath = path.join(
+        __dirname,
+        "processedFolder",
+        task.subjectCode,
+      );
+
+      if (!fs.existsSync(subjectFolderPath)) {
+        return res.status(404).json({
+          message: "Processed folder not found for subject",
+        });
+      }
+
+      const allPdfs = fs
+        .readdirSync(subjectFolderPath)
+        .filter((f) => f.endsWith(".pdf"));
+
+      // PDFs already assigned to THIS task
+      const alreadyAssigned = await AnswerPdf.find({
+        taskId,
+      }).distinct("answerPdfName");
+
+      const available = allPdfs.filter((pdf) => !alreadyAssigned.includes(pdf));
+
+      if (available.length < allocate) {
+        return res.status(400).json({
+          message: "Not enough unassigned PDFs available",
+        });
+      }
+
+      const newAssignments = available.slice(0, allocate).map((pdf) => ({
+        taskId,
+        answerPdfName: pdf,
+        status: "false",
+        assignedDate: new Date(),
+      }));
+
+      await AnswerPdf.insertMany(newAssignments, { session });
+
+      // Update task count
+      task.totalBooklets += newAssignments.length;
+
+      // 🔁 Update SubjectFolderModel counts
+      await SubjectFolderModel.updateOne(
+        { folderName: task.subjectCode },
+        {
+          $inc: {
+            allocated: newAssignments.length,
+            unAllocated: -newAssignments.length,
+          },
+          $set: { updatedAt: new Date() },
+        },
+        { session },
+      );
+    }
+
+    // 3️⃣ Save task
+    await task.save({ session });
+
+    // 4️⃣ Commit transaction
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      success: true,
+      message: "Task updated successfully",
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    console.error("❌ Edit task error:", error);
+    return res.status(500).json({
+      message: "Failed to edit task",
+    });
+  }
+};
+
 const getUserCurrentTaskStatus = async (req, res) => {
   const { userId } = req.params;
 
@@ -2435,6 +2591,7 @@ export {
   getAllTasksBasedOnSubjectCode,
   completedBookletHandler,
   checkTaskCompletionHandler,
+  editTaskHandler,
   autoAssigning,
   rejectBooklet,
 };

@@ -4,6 +4,7 @@ import SubjectFolderModel from "../../models/StudentModels/subjectFolderModel.js
 import { isValidObjectId } from "../../services/mongoIdValidation.js";
 import CourseSchemaRelation from "../../models/subjectSchemaRelationModel/subjectSchemaRelationModel.js";
 import CoordinateAllocation from "../../models/subjectSchemaRelationModel/coordinateAllocationModel.js";
+import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchema.js";
 import Schema from "../../models/schemeModel/schema.js";
 import fs from "fs";
 import path from "path";
@@ -497,6 +498,163 @@ try {
 };
 
 
+
+// import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchema.js";
+
+
+// /* -------------------------------------------------------------------------- */
+// /*                         Getting The Questions By Subject                    */
+// /* -------------------------------------------------------------------------- */
+
+// const getQuestionsBySubjectFolder = async (req, res) => {
+// try {
+//     const { folderName } = req.params;
+
+//     if (!folderName) {
+//      return res.status(400).json({
+//         message: "folderName is required",
+//      });
+//     }
+
+//     /* --------------------------------
+//      1️⃣ SUBJECT FOLDER → SUBJECT
+//     -------------------------------- */
+//     const subject = await Subject.findOne({ code: folderName }).lean();
+
+//     if (!subject) {
+//      return res.status(404).json({
+//         message: `No subject found for folder '${folderName}'`,
+//      });
+//     }
+
+//     /* --------------------------------
+//      2️⃣ SUBJECT → SCHEMA RELATION
+//     -------------------------------- */
+//     const schemaRelation = await CourseSchemaRelation.findOne({
+//      subjectId: subject._id,
+//     }).lean();
+
+//     if (!schemaRelation) {
+//      return res.status(404).json({
+//         message: "No schema mapped to this subject",
+//      });
+//     }
+
+//     const schemaId = schemaRelation.schemaId;
+
+//     /* --------------------------------
+//      3️⃣ SCHEMA → QUESTIONS
+//     -------------------------------- */
+//     const questions = await QuestionDefinition.find({
+//      schemaId: schemaId,
+//     })
+//      .sort({ questionsName: 1 }) // keeps order
+//      .lean();
+
+//     if (!questions || questions.length === 0) {
+//      return res.status(404).json({
+//         message: "No questions found for this schema",
+//      });
+//     }
+
+//     /* --------------------------------
+//      RESPONSE
+//     -------------------------------- */
+//     return res.status(200).json({
+//      subject: {
+//         id: subject._id,
+//         name: subject.name,
+//         code: subject.code,
+//      },
+//      schemaId,
+//      totalQuestions: questions.length,
+//      questions,
+//     });
+// } catch (error) {
+//     console.error("getQuestionsBySubjectFolder error:", error);
+//     return res.status(500).json({
+//      message: "Failed to fetch questions",
+//     });
+// }
+// };
+
+
+
+// /* -------------------------------------------------------------------------- */
+// /*                           Getting The Questions By Subject                    */
+// /* -------------------------------------------------------------------------- */
+
+// const getQuestionsBySubjectFolder = async (req, res) => {
+//   try {
+//     const { folderName } = req.params;
+
+//     if (!folderName) {
+//       return res.status(400).json({
+//         message: "folderName is required",
+//       });
+//     }
+
+//     /* --------------------------------
+//        1️⃣ SUBJECT FOLDER → SUBJECT
+//     -------------------------------- */
+//     const subject = await Subject.findOne({ code: folderName }).lean();
+
+//     if (!subject) {
+//       return res.status(404).json({
+//         message: `No subject found for folder '${folderName}'`,
+//       });
+//     }
+
+//     /* --------------------------------
+//        2️⃣ SUBJECT → SCHEMA RELATION
+//     -------------------------------- */
+//     const schemaRelation = await CourseSchemaRelation.findOne({
+//       subjectId: subject._id,
+//     }).lean();
+
+//     if (!schemaRelation) {
+//       return res.status(404).json({
+//         message: "No schema mapped to this subject",
+//       });
+//     }
+
+//     const schemaId = schemaRelation.schemaId;
+
+//     /* --------------------------------
+//        3️⃣ SCHEMA → QUESTIONS
+//     -------------------------------- */
+//     const questions = await QuestionDefinition.find({
+//       schemaId: schemaId,
+//     })
+//       .sort({ questionsName: 1 }) // keeps order
+//       .lean();
+
+//     if (!questions || questions.length === 0) {
+//       return res.status(404).json({
+//         message: "No questions found for this schema",
+//       });
+//     }
+
+//     /* --------------------------------
+//        RESPONSE
+//     -------------------------------- */
+//     return res.status(200).json({
+//       subject: {
+//         id: subject._id,
+//         name: subject.name,
+//         code: subject.code,
+//       },
+//       schemaId,
+//       totalQuestions: questions.length,
+//       questions,
+//     });
+//   } catch (error) {
+//     console.error("getQuestionsBySubjectFolder error:", error);
+//     return res.status(500).json({
+//       message: "Failed to fetch questions",
+//     });
+//   }
+// };
 
 export {
   createSubject,
