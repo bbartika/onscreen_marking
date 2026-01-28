@@ -626,7 +626,6 @@ const getcoordinateSupplimentarypdf = async (req, res) => {
   }
 };
 
-<<<<<<< HEAD
 /* -------------------------------------------------------------------------- */
 /*                           New PDF Upload Pipeline                          */
 /* -------------------------------------------------------------------------- */
@@ -806,9 +805,6 @@ const serveAnswerPdfImage = async (req, res) => {
   }
 };
 
-
-=======
->>>>>>> d4c66b8caa643ddb87a17c17fe9afd8cde5bf74a
 export {
   createSchema,
   updateSchema,
