@@ -10,10 +10,17 @@ const studentAnswerPdf = new mongoose.Schema({
         type: String,
         required: true
     },
+    questiondefinitionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "QuestionDefinition",
+        required: true,
+      },
     status: {
         type: String,
         default: false
     },
+    
+    
     assignedDate: {
         type: Date,
         required: true,
