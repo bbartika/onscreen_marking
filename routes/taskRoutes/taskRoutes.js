@@ -18,7 +18,8 @@ import {
     checkTaskCompletionHandler,
     editTaskHandler,
     autoAssigning,
-    rejectBooklet
+    rejectBooklet,
+    getReviewerTask
     // generatePdfForCompletedBooklet
 } from "../../controllers/taskControllers/taskControllers.js";
 
@@ -39,6 +40,7 @@ router.put("/edit/task/:taskId", editTaskHandler);
 router.put("/update/task/currentIndex/:id", updateCurrentIndex);
 router.delete("/remove/task/:id", removeAssignedTask);
 router.get("/get/all/tasks", getAllTaskHandler);
+router.get("/get/reviewerTask/:id", getReviewerTask);
 router.get("/get/task/:id", getAssignTaskById);
 router.get("/get/questiondefinition", getQuestionDefinitionTaskId);
 router.get("/getall/tasks/:userId", getAllAssignedTaskByUserId);

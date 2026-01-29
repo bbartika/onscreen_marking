@@ -15,6 +15,7 @@ const answerPdfImageSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  page: { type: Number, required: true },
   status: {
     type: String,
     required: true,

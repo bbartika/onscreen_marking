@@ -418,7 +418,7 @@ const getAllSubjectBasedOnClassId = async (req, res) => {
   }
 };
 
-import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchema.js";
+// import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchema.js";
 
 
 /* -------------------------------------------------------------------------- */

@@ -902,44 +902,197 @@ export default function handleAnnotationSocket(io) {
 
     // ✅ Leave room
 
-    socket.on("get-questions", async (data) => {
-      try {
+    // socket.on("get-questions", async (data) => {
+    //   try {
+    //     console.log("📊 Get questions request:", data);
+
+    //     // Expect data to contain taskId and answerPdfId
+    //     const { taskId, userId, answerPdfId } = data;
+
+    //     if (answerPdfId === null || answerPdfId === undefined) {
+    //       return { annotations: [], comments: [] };
+    //     }
+
+    //     if (!taskId || !answerPdfId) {
+    //       throw new Error("taskId and answerPdfId are required");
+    //     }
+
+    //     // Validate IDs
+    //     if (!isValidObjectId(taskId)) {
+    //       throw new Error("Invalid task ID");
+    //     }
+
+    //     if (!isValidObjectId(answerPdfId)) {
+    //       throw new Error("Invalid answerPdfId");
+    //     }
+
+    //     // Check if marks data already exists in local file
+    //     const questionMarksData = loadMarksData(userId, answerPdfId);
+
+    //     if (questionMarksData.marks && questionMarksData.marks.length > 0) {
+    //       console.log("✅ Marks data already exists, skipping creation");
+
+    //       // Emit existing data back to client
+    //       socket.emit("questions-data", {
+    //         success: true,
+    //         answerPdfId: answerPdfId,
+    //         marks: questionMarksData.marks,
+    //         status: "completed",
+    //       });
+    //       return;
+    //     }
+
+    //     console.log(`🔄 Fetching question definitions for task ${taskId}`);
+
+    //     // Retrieve the task from database
+    //     const task = await Task.findById(taskId);
+    //     if (!task) {
+    //       throw new Error("Task not found");
+    //     }
+
+    //     const subject = await Subject.findOne({ code: task.subjectCode });
+    //     if (!subject) {
+    //       throw new Error("Subject not found (create subject)");
+    //     }
+
+    //     const courseSchemaDetails = await SubjectSchemaRelation.findOne({
+    //       subjectId: subject._id,
+    //     });
+    //     if (!courseSchemaDetails) {
+    //       throw new Error("Schema not found for the subject");
+    //     }
+
+    //     const schemaDetails = await Schema.findOne({
+    //       _id: courseSchemaDetails.schemaId,
+    //     });
+    //     if (!schemaDetails) {
+    //       throw new Error("Schema not found");
+    //     }
+
+    //     // Fetch all QuestionDefinitions for the schema
+    //     const questionDefinitions = await QuestionDefinition.find({
+    //       schemaId: schemaDetails.id,
+    //     });
+
+    //     if (!questionDefinitions || questionDefinitions.length === 0) {
+    //       throw new Error("No QuestionDefinitions found");
+    //     }
+
+    //     // Fetch Marks data from database based on the provided answerPdfId
+    //     const marksData = await Marks.find({ answerPdfId: answerPdfId });
+
+    //     // Create file data structure
+    //     const fileData = {
+    //       marks: [],
+    //     };
+
+    //     // Process each question definition and combine with marks data
+    //     questionDefinitions.forEach((question, index) => {
+    //       // Find the related Marks entry for the current questionDefinitionId
+    //       const marks = marksData.find(
+    //         (m) =>
+    //           m.questionDefinitionId.toString() === question._id.toString(),
+    //       );
+
+    //       // Use marks data if exists, otherwise use defaults
+    //       const marksInfo = marks
+    //         ? {
+    //             allottedMarks: marks.allottedMarks,
+    //             timerStamps: marks.timerStamps,
+    //             isMarked: marks.isMarked,
+    //           }
+    //         : {
+    //             allottedMarks: 0,
+    //             timerStamps: "",
+    //             isMarked: false,
+    //           };
+
+    //       const marksDataObj = {
+    //         _id: question._id.toString(),
+    //         schemaId: question.schemaId,
+    //         parentQuestionId: question.parentQuestionId || null,
+    //         questionsName: question.questionsName,
+    //         maxMarks: question.maxMarks || 10,
+    //         minMarks: question.minMarks || 0,
+    //         isSubQuestion: question.isSubQuestion || false,
+    //         bonusMarks: question.bonusMarks || 0,
+    //         marksDifference: question.marksDifference || 1,
+    //         numberOfSubQuestions: question.numberOfSubQuestions || 0,
+    //         compulsorySubQuestions: question.compulsorySubQuestions || 0,
+    //         __v: question.__v || 0,
+    //         allottedMarks: marksInfo.allottedMarks,
+    //         answerPdfId: answerPdfId,
+    //         timerStamps: marksInfo.timerStamps,
+    //         isMarked: marksInfo.isMarked,
+    //         updatedAt: new Date().toISOString(),
+    //       };
+
+    //       fileData.marks.push(marksDataObj);
+    //       console.log(
+    //         `✅ Processed question ${index + 1}: ${marksDataObj.questionsName}`,
+    //       );
+    //     });
+
+    //     // Save to local file
+    //     saveMarksData(userId, answerPdfId, fileData);
+    //     console.log(
+    //       `✅ Saved ${fileData.marks.length} questions to local file`,
+    //     );
+
+    //     // Emit back to the socket
+    //     socket.emit("questions-data", {
+    //       success: true,
+    //       answerPdfId: answerPdfId,
+    //       marks: fileData.marks,
+    //       status: "completed",
+    //     });
+    //   } catch (error) {
+    //     console.error("Error in get-questions:", error);
+    //     socket.emit("error", {
+    //       success: false,
+    //       message: error.message,
+    //     });
+    //   }
+    // });
+    //annotationSocket/get-questions
+socket.on("get-questions", async (data) => {
+     try {
         console.log("📊 Get questions request:", data);
 
         // Expect data to contain taskId and answerPdfId
         const { taskId, userId, answerPdfId } = data;
 
         if (answerPdfId === null || answerPdfId === undefined) {
-          return { annotations: [], comments: [] };
+         return { annotations: [], comments: [] };
         }
 
         if (!taskId || !answerPdfId) {
-          throw new Error("taskId and answerPdfId are required");
+         throw new Error("taskId and answerPdfId are required");
         }
 
         // Validate IDs
         if (!isValidObjectId(taskId)) {
-          throw new Error("Invalid task ID");
+         throw new Error("Invalid task ID");
         }
 
         if (!isValidObjectId(answerPdfId)) {
-          throw new Error("Invalid answerPdfId");
+         throw new Error("Invalid answerPdfId");
         }
 
         // Check if marks data already exists in local file
         const questionMarksData = loadMarksData(userId, answerPdfId);
 
         if (questionMarksData.marks && questionMarksData.marks.length > 0) {
-          console.log("✅ Marks data already exists, skipping creation");
+         console.log("✅ Marks data already exists, skipping creation");
 
-          // Emit existing data back to client
-          socket.emit("questions-data", {
+         // Emit existing data back to client
+         socket.emit("questions-data", {
             success: true,
             answerPdfId: answerPdfId,
             marks: questionMarksData.marks,
             status: "completed",
-          });
-          return;
+         });
+         return;
         }
 
         console.log(`🔄 Fetching question definitions for task ${taskId}`);
@@ -947,35 +1100,45 @@ export default function handleAnnotationSocket(io) {
         // Retrieve the task from database
         const task = await Task.findById(taskId);
         if (!task) {
-          throw new Error("Task not found");
+         throw new Error("Task not found");
+        }
+
+        const taskQuestionDefinitionId = task.questiondefinitionId;
+
+        if (!taskQuestionDefinitionId) {
+         throw new Error("Task does not have questionDefinitionId");
         }
 
         const subject = await Subject.findOne({ code: task.subjectCode });
         if (!subject) {
-          throw new Error("Subject not found (create subject)");
+         throw new Error("Subject not found (create subject)");
         }
 
         const courseSchemaDetails = await SubjectSchemaRelation.findOne({
-          subjectId: subject._id,
+         subjectId: subject._id,
         });
         if (!courseSchemaDetails) {
-          throw new Error("Schema not found for the subject");
+         throw new Error("Schema not found for the subject");
         }
 
         const schemaDetails = await Schema.findOne({
-          _id: courseSchemaDetails.schemaId,
+         _id: courseSchemaDetails.schemaId,
         });
         if (!schemaDetails) {
-          throw new Error("Schema not found");
+         throw new Error("Schema not found");
         }
 
         // Fetch all QuestionDefinitions for the schema
+        // const questionDefinitions = await QuestionDefinition.find({
+        // schemaId: schemaDetails.id,
+        // });
+
         const questionDefinitions = await QuestionDefinition.find({
-          schemaId: schemaDetails.id,
+         _id: taskQuestionDefinitionId,
         });
 
         if (!questionDefinitions || questionDefinitions.length === 0) {
-          throw new Error("No QuestionDefinitions found");
+         throw new Error("No QuestionDefinitions found");
         }
 
         // Fetch Marks data from database based on the provided answerPdfId
@@ -983,31 +1146,31 @@ export default function handleAnnotationSocket(io) {
 
         // Create file data structure
         const fileData = {
-          marks: [],
+         marks: [],
         };
 
         // Process each question definition and combine with marks data
         questionDefinitions.forEach((question, index) => {
-          // Find the related Marks entry for the current questionDefinitionId
-          const marks = marksData.find(
+         // Find the related Marks entry for the current questionDefinitionId
+         const marks = marksData.find(
             (m) =>
-              m.questionDefinitionId.toString() === question._id.toString(),
-          );
+             m.questionDefinitionId.toString() === question._id.toString(),
+         );
 
-          // Use marks data if exists, otherwise use defaults
-          const marksInfo = marks
+         // Use marks data if exists, otherwise use defaults
+         const marksInfo = marks
             ? {
                 allottedMarks: marks.allottedMarks,
                 timerStamps: marks.timerStamps,
                 isMarked: marks.isMarked,
-              }
+             }
             : {
                 allottedMarks: 0,
                 timerStamps: "",
                 isMarked: false,
-              };
+             };
 
-          const marksDataObj = {
+         const marksDataObj = {
             _id: question._id.toString(),
             schemaId: question.schemaId,
             parentQuestionId: question.parentQuestionId || null,
@@ -1025,74 +1188,74 @@ export default function handleAnnotationSocket(io) {
             timerStamps: marksInfo.timerStamps,
             isMarked: marksInfo.isMarked,
             updatedAt: new Date().toISOString(),
-          };
+         };
 
-          fileData.marks.push(marksDataObj);
-          console.log(
+         fileData.marks.push(marksDataObj);
+         console.log(
             `✅ Processed question ${index + 1}: ${marksDataObj.questionsName}`,
-          );
+         );
         });
 
         // Save to local file
         saveMarksData(userId, answerPdfId, fileData);
         console.log(
-          `✅ Saved ${fileData.marks.length} questions to local file`,
+         `✅ Saved ${fileData.marks.length} questions to local file`,
         );
 
         // Emit back to the socket
         socket.emit("questions-data", {
-          success: true,
-          answerPdfId: answerPdfId,
-          marks: fileData.marks,
-          status: "completed",
+         success: true,
+         answerPdfId: answerPdfId,
+         marks: fileData.marks,
+         status: "completed",
         });
-      } catch (error) {
+     } catch (error) {
         console.error("Error in get-questions:", error);
         socket.emit("error", {
-          success: false,
-          message: error.message,
+         success: false,
+         message: error.message,
         });
-      }
+     }
     });
 
     socket.on("get-allquestions", async (data) => {
-      try {
+     try {
         console.log("📊 Get questions request:", data);
 
         // Expect data to contain taskId and answerPdfId
-        const { taskId, userId, answerPdfId, questiondefinitionId } = data;
+        const { taskId, userId, answerPdfId } = data;
 
         if (answerPdfId === null || answerPdfId === undefined) {
-          return { annotations: [], comments: [] };
+         return { annotations: [], comments: [] };
         }
 
         if (!taskId || !answerPdfId) {
-          throw new Error("taskId and answerPdfId are required");
+         throw new Error("taskId and answerPdfId are required");
         }
 
         // Validate IDs
         if (!isValidObjectId(taskId)) {
-          throw new Error("Invalid task ID");
+         throw new Error("Invalid task ID");
         }
 
         if (!isValidObjectId(answerPdfId)) {
-          throw new Error("Invalid answerPdfId");
+         throw new Error("Invalid answerPdfId");
         }
 
         // Check if marks data already exists in local file
         const questionMarksData = loadMarksData(userId, answerPdfId);
 
         if (questionMarksData.marks && questionMarksData.marks.length > 0) {
-          console.log("✅ Marks data already exists, skipping creation");
+         console.log("✅ Marks data already exists, skipping creation");
 
-          // Emit existing data back to client
-          socket.emit("allquestions-data", {
+         // Emit existing data back to client
+         socket.emit("allquestions-data", {
             success: true,
             answerPdfId: answerPdfId,
             marks: questionMarksData.marks,
             status: "completed",
-          });
-          return;
+         });
+         return;
         }
 
         console.log(`🔄 Fetching question definitions for task ${taskId}`);
@@ -1100,35 +1263,45 @@ export default function handleAnnotationSocket(io) {
         // Retrieve the task from database
         const task = await Task.findById(taskId);
         if (!task) {
-          throw new Error("Task not found");
+         throw new Error("Task not found");
+        }
+
+        const taskQuestionDefinitionId = task.questiondefinitionId;
+
+        if (!taskQuestionDefinitionId) {
+         throw new Error("Task does not have questionDefinitionId");
         }
 
         const subject = await Subject.findOne({ code: task.subjectCode });
         if (!subject) {
-          throw new Error("Subject not found (create subject)");
+         throw new Error("Subject not found (create subject)");
         }
 
         const courseSchemaDetails = await SubjectSchemaRelation.findOne({
-          subjectId: subject._id,
+         subjectId: subject._id,
         });
         if (!courseSchemaDetails) {
-          throw new Error("Schema not found for the subject");
+         throw new Error("Schema not found for the subject");
         }
 
         const schemaDetails = await Schema.findOne({
-          _id: courseSchemaDetails.schemaId,
+         _id: courseSchemaDetails.schemaId,
         });
         if (!schemaDetails) {
-          throw new Error("Schema not found");
+         throw new Error("Schema not found");
         }
 
         // Fetch all QuestionDefinitions for the schema
-        const questionDefinition = await QuestionDefinition.find({
-          _id: questiondefinitionId,
+        // const questionDefinitions = await QuestionDefinition.find({
+        // schemaId: schemaDetails.id,
+        // });
+
+        const questionDefinitions = await QuestionDefinition.find({
+         _id: taskQuestionDefinitionId,
         });
 
-        if (!questionDefinition ) {
-          throw new Error("No QuestionDefinitions found");
+        if (!questionDefinitions || questionDefinitions.length === 0) {
+         throw new Error("No QuestionDefinitions found");
         }
 
         // Fetch Marks data from database based on the provided answerPdfId
@@ -1136,31 +1309,31 @@ export default function handleAnnotationSocket(io) {
 
         // Create file data structure
         const fileData = {
-          marks: [],
+         marks: [],
         };
 
         // Process each question definition and combine with marks data
         questionDefinitions.forEach((question, index) => {
-          // Find the related Marks entry for the current questionDefinitionId
-          const marks = marksData.find(
+         // Find the related Marks entry for the current questionDefinitionId
+         const marks = marksData.find(
             (m) =>
-              m.questionDefinitionId.toString() === question._id.toString(),
-          );
+             m.questionDefinitionId.toString() === question._id.toString(),
+         );
 
-          // Use marks data if exists, otherwise use defaults
-          const marksInfo = marks
+         // Use marks data if exists, otherwise use defaults
+         const marksInfo = marks
             ? {
                 allottedMarks: marks.allottedMarks,
                 timerStamps: marks.timerStamps,
                 isMarked: marks.isMarked,
-              }
+             }
             : {
                 allottedMarks: 0,
                 timerStamps: "",
                 isMarked: false,
-              };
+             };
 
-          const marksDataObj = {
+         const marksDataObj = {
             _id: question._id.toString(),
             schemaId: question.schemaId,
             parentQuestionId: question.parentQuestionId || null,
@@ -1178,34 +1351,34 @@ export default function handleAnnotationSocket(io) {
             timerStamps: marksInfo.timerStamps,
             isMarked: marksInfo.isMarked,
             updatedAt: new Date().toISOString(),
-          };
+         };
 
-          fileData.marks.push(marksDataObj);
-          console.log(
+         fileData.marks.push(marksDataObj);
+         console.log(
             `✅ Processed question ${index + 1}: ${marksDataObj.questionsName}`,
-          );
+         );
         });
 
         // Save to local file
         saveMarksData(userId, answerPdfId, fileData);
         console.log(
-          `✅ Saved ${fileData.marks.length} questions to local file`,
+         `✅ Saved ${fileData.marks.length} questions to local file`,
         );
 
         // Emit back to the socket
         socket.emit("questions-data", {
-          success: true,
-          answerPdfId: answerPdfId,
-          marks: fileData.marks,
-          status: "completed",
+         success: true,
+         answerPdfId: answerPdfId,
+         marks: fileData.marks,
+         status: "completed",
         });
-      } catch (error) {
+     } catch (error) {
         console.error("Error in get-questions:", error);
         socket.emit("error", {
-          success: false,
-          message: error.message,
+         success: false,
+         message: error.message,
         });
-      }
+     }
     });
 
     socket.on("get-marks-data", async (data) => {

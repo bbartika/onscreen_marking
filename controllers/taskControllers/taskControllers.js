@@ -22,121 +22,263 @@ import Icon from "../../models/EvaluationModels/iconModel.js";
 import { subjectsWithTasks } from "../classControllers/subjectControllers.js";
 // import { ConversationsMessageFile } from "sib-api-v3-sdk";
 
+// const extractQuestionImages = async (
+//   coordinates,
+//   pageImages, // array from AnswerPdfImage.find()
+//   pageImagesFolder, // folder with image_1.png, image_2.png, … (your renamed pages)
+//   outputFolder,
+// ) => {
+//   console.log(
+//     "Starting question image extraction — total pages in DB:",
+//     pageImages.length,
+//   );
+
+//   console.log("pageImages", pageImages);
+
+//   if (!fs.existsSync(outputFolder)) {
+//     fs.mkdirSync(outputFolder, { recursive: true });
+//   }
+
+//   const results = [];
+
+//   // ── WHOLE PAGES ─────────────────────────────────────────────────────
+//   if (
+//     Array.isArray(coordinates.wholePages) &&
+//     coordinates.wholePages.length > 0
+//   ) {
+//     for (const pageNum of coordinates.wholePages) {
+//       const idx = pageNum - 1; // array is 0-based
+//       const pageRecord = pageImages[idx];
+
+//       if (!pageRecord || !pageRecord.name) {
+//         console.warn(`Whole page ${pageNum} → no matching image record`);
+//         continue;
+//       }
+
+//       const source = path.join(pageImagesFolder, pageRecord.name);
+//       if (!fs.existsSync(source)) {
+//         console.error(`Whole page ${pageNum} source missing: ${source}`);
+//         continue;
+//       }
+
+//       const targetName = `image_${pageNum}_whole.png`;
+//       const targetPath = path.join(outputFolder, targetName);
+
+//       try {
+//         await sharp(source).toFile(targetPath);
+//         console.log(`Whole page ${pageNum} → ${targetName}`);
+
+//         results.push({
+//           type: "whole",
+//           page: pageNum,
+//           image: targetName,
+//           originalImage: pageRecord.name,
+//         });
+//       } catch (err) {
+//         console.error(`Whole page ${pageNum} failed: ${err.message}`);
+//       }
+//     }
+//   }
+
+//   // ── PARTIAL AREAS ───────────────────────────────────────────────────
+//   if (
+//     coordinates.partialAreas &&
+//     typeof coordinates.partialAreas === "object"
+//   ) {
+//     for (const [pageKey, areas] of Object.entries(coordinates.partialAreas)) {
+//       const pageNum = Number(pageKey);
+//       if (isNaN(pageNum)) continue;
+
+//       const idx = pageNum - 1;
+//       const pageRecord = pageImages[idx];
+
+//       if (!pageRecord || !pageRecord.name) {
+//         console.warn(`Partial page ${pageNum} → no matching image record`);
+//         continue;
+//       }
+
+//       const source = path.join(pageImagesFolder, pageRecord.name);
+//       if (!fs.existsSync(source)) {
+//         console.error(`Partial page ${pageNum} source missing: ${source}`);
+//         continue;
+//       }
+
+//       // Reuse sharp instance for efficiency (but clone per crop)
+//       const sharpSrc = sharp(source);
+
+//       for (let i = 0; i < areas.length; i++) {
+//         const { x, y, width, height } = areas[i];
+
+//         if ([x, y, width, height].some((v) => v == null || v <= 0)) {
+//           console.warn(`Invalid coords on page ${pageNum} area ${i + 1}`);
+//           continue;
+//         }
+
+//         const targetName = `image_${pageNum}_partial_${i + 1}.png`;
+//         const targetPath = path.join(outputFolder, targetName);
+
+//         try {
+//           await sharpSrc
+//             .clone()
+//             .extract({
+//               left: Math.round(x),
+//               top: Math.round(y),
+//               width: Math.round(width),
+//               height: Math.round(height),
+//             })
+//             .toFile(targetPath);
+
+//           console.log(`Page ${pageNum} area ${i + 1} → ${targetName}`);
+
+//           results.push({
+//             type: "partial",
+//             page: pageNum,
+//             areaIndex: i + 1,
+//             image: targetName,
+//             coordinates: { x, y, width, height },
+//             originalImage: pageRecord.name,
+//           });
+//         } catch (err) {
+//           console.error(`Page ${pageNum} area ${i + 1} failed: ${err.message}`);
+//         }
+//       }
+//     }
+//   }
+
+//   console.log(
+//     `Question image extraction finished — created ${results.length} files`,
+//   );
+//   return results;
+// };
 const extractQuestionImages = async (
   coordinates,
-  pageImages,
+  pageImages,          // array of documents from DB
   pageImagesFolder,
   outputFolder,
 ) => {
+  console.log(
+    "Starting question image extraction — total pages in DB:",
+    pageImages.length,
+  );
+
+  // Debug: show exactly what we received
+  console.log("Received pageImages contents:");
+  pageImages.forEach((img, index) => {
+    console.log(
+      `  index ${index}: page=${img.page} (${typeof img.page}), name=${img.name || '(missing name)'}`
+    );
+  });
+
+  if (pageImages.length === 0) {
+    console.warn("No pages received → extraction will be empty");
+    return [];
+  }
+
   if (!fs.existsSync(outputFolder)) {
     fs.mkdirSync(outputFolder, { recursive: true });
   }
 
   const results = [];
 
-  // ✅ WHOLE PAGES - COPY TO OUTPUT FOLDER
-  if (Array.isArray(coordinates.wholePages)) {
-    for (const page of coordinates.wholePages) {
-      const pageImage = pageImages[page - 1]; // page is 1-based
+  // SAFE LOOKUP: find document by its page number
+  const findRecordByPage = (pageNum) =>
+    pageImages.find((record) => Number(record.page) === Number(pageNum));
 
-      if (!pageImage || !pageImage.name) {
-        console.warn(`⚠️ Page ${page}: No image found in database`);
+  // ── WHOLE PAGES ─────────────────────────────────────────────────────
+  if (Array.isArray(coordinates.wholePages) && coordinates.wholePages.length > 0) {
+    for (const pageNum of coordinates.wholePages) {
+      const pageRecord = findRecordByPage(pageNum);
+      if (!pageRecord || !pageRecord.name) {
+        console.warn(`Whole page ${pageNum} → no matching record`);
         continue;
       }
 
-      const sourcePath = path.join(pageImagesFolder, pageImage.name);
-
-      // Check if source file exists
-      if (!fs.existsSync(sourcePath)) {
-        console.error(`❌ Page ${page}: Source not found at ${sourcePath}`);
+      const source = path.join(pageImagesFolder, pageRecord.name);
+      if (!fs.existsSync(source)) {
+        console.error(`Whole page ${pageNum} source missing: ${source}`);
         continue;
       }
 
-      // Create output filename
-      const outputName = `image_${page}.png`;
-      const outputPath = path.join(outputFolder, outputName);
+      const targetName = `image_${pageNum}.png`;
+      const targetPath = path.join(outputFolder, targetName);
 
       try {
-        // Copy entire page image to output folder
-        await sharp(sourcePath).toFile(outputPath);
-
-        console.log(`✅ Copied whole page ${page} → ${outputName}`);
-
+        await sharp(source).toFile(targetPath);
+        console.log(`Whole page ${pageNum} → ${targetName}`);
         results.push({
           type: "whole",
-          page,
-          image: outputName, // ✅ Points to file in outputFolder
-          originalImage: pageImage.name,
+          page: pageNum,
+          image: targetName,
+          originalImage: pageRecord.name,
         });
       } catch (err) {
-        console.error(`❌ Failed to copy page ${page}:`, err.message);
+        console.error(`Whole page ${pageNum} failed: ${err.message}`);
       }
     }
   }
 
-  // ✅ PARTIAL AREAS - EXTRACT TO OUTPUT FOLDER
-  if (coordinates.partialAreas) {
-    for (const [pageStr, areas] of Object.entries(coordinates.partialAreas)) {
-      const page = Number(pageStr);
-      const pageImage = pageImages[page - 1];
+  // ── PARTIAL AREAS ───────────────────────────────────────────────────
+  if (coordinates.partialAreas && typeof coordinates.partialAreas === "object") {
+    for (const [pageKey, areas] of Object.entries(coordinates.partialAreas)) {
+      const pageNum = Number(pageKey);
+      if (isNaN(pageNum)) continue;
 
-      if (!pageImage || !pageImage.name) {
-        console.warn(`⚠️ Page ${page}: No image found for partial areas`);
+      const pageRecord = findRecordByPage(pageNum);
+      if (!pageRecord || !pageRecord.name) {
+        console.warn(`Partial page ${pageNum} → no matching record`);
         continue;
       }
 
-      const sourcePath = path.join(pageImagesFolder, pageImage.name);
-
-      if (!fs.existsSync(sourcePath)) {
-        console.error(`❌ Page ${page}: Source not found at ${sourcePath}`);
+      const source = path.join(pageImagesFolder, pageRecord.name);
+      if (!fs.existsSync(source)) {
+        console.error(`Partial page ${pageNum} source missing: ${source}`);
         continue;
       }
+
+      const sharpSrc = sharp(source);
 
       for (let i = 0; i < areas.length; i++) {
         const { x, y, width, height } = areas[i];
 
-        // Validate coordinates
-        if (x < 0 || y < 0 || width <= 0 || height <= 0) {
-          console.warn(`⚠️ Page ${page}, area ${i + 1}: Invalid coordinates`);
+        if ([x, y, width, height].some((v) => v == null || v <= 0)) {
+          console.warn(`Invalid coords on page ${pageNum} area ${i + 1}`);
           continue;
         }
 
-        const outputName = `image_${page}.png`;
-        const outputPath = path.join(outputFolder, outputName);
+        const targetName = `image_${pageNum}.png`;
+        const targetPath = path.join(outputFolder, targetName);
 
         try {
-          await sharp(sourcePath)
+          await sharpSrc
+            .clone()
             .extract({
               left: Math.round(x),
               top: Math.round(y),
               width: Math.round(width),
               height: Math.round(height),
             })
-            .toFile(outputPath);
+            .toFile(targetPath);
 
-          console.log(
-            `✅ Extracted page ${page} area ${i + 1} → ${outputName}`,
-          );
+          console.log(`Page ${pageNum} area ${i + 1} → ${targetName}`);
 
           results.push({
             type: "partial",
-            page,
+            page: pageNum,
             areaIndex: i + 1,
-            image: outputName,
+            image: targetName,
             coordinates: { x, y, width, height },
-            originalImage: pageImage.name,
+            originalImage: pageRecord.name,
           });
         } catch (err) {
-          console.error(
-            `❌ Failed to extract page ${page} area ${i + 1}:`,
-            err.message,
-          );
+          console.error(`Page ${pageNum} area ${i + 1} failed: ${err.message}`);
         }
       }
     }
   }
 
-  console.log(`📊 Total question images extracted: ${results.length}`);
+  console.log(
+    `Question image extraction finished — created ${results.length} files`,
+  );
   return results;
 };
 
@@ -226,251 +368,392 @@ const extractQuestionImages = async (
 //   return results;
 // };
 
+// const assigningTask = async (req, res) => {
+//   const { userId, subjectCode, questiondefinitionId, bookletsToAssign } =
+//     req.body;
+//   console.log(
+//     "userId,  subjectCode,questionDefinitionId, bookletsToAssign",
+//     userId,
+//     subjectCode,
+//     questiondefinitionId,
+//     bookletsToAssign,
+//   );
+
+//   const session = await mongoose.startSession();
+
+//   try {
+//     session.startTransaction();
+
+//     if (!userId || !subjectCode || !questiondefinitionId || !bookletsToAssign) {
+//       return res.status(400).json({ message: "All fields are required" });
+//     }
+
+//     if (!isValidObjectId(userId)) {
+//       return res.status(400).json({ message: "Invalid user ID." });
+//     }
+
+//     const user = await User.findById(userId);
+
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     const subjectCodes = user.subjectCode;
+
+//     if (!subjectCodes || subjectCodes.length === 0) {
+//       return res
+//         .status(404)
+//         .json({ message: "No subjects found for the user." });
+//     }
+
+//     const subjectDetails = await Subject.find({ _id: { $in: subjectCodes } });
+//     // console.log("subjectDetails", subjectDetails);
+
+//     // If no subjects found
+//     if (subjectDetails.length === 0) {
+//       return res
+//         .status(404)
+//         .json({ message: "No subjects found for the given IDs." });
+//     }
+
+//     // Check if the subject code exists
+//     const subject = subjectDetails.find(
+//       (subject) => subject.code === subjectCode,
+//     );
+
+//     if (!subject) {
+//       return res.status(404).json({
+//         message: "Subject not found (upload master and question booklet).",
+//       });
+//     }
+
+//     // Check if the folder for the subject code exists
+//     const rootFolder = path.join(__dirname, "processedFolder");
+//     const subjectFolder = path.join(rootFolder, subjectCode);
+
+//     if (!fs.existsSync(subjectFolder)) {
+//       return res.status(404).json({ message: "Subject folder not found." });
+//     }
+
+//     // Get all PDFs in the folder
+//     const allPdfs = fs
+//       .readdirSync(subjectFolder)
+//       .filter((file) => file.endsWith(".pdf"));
+
+//     // Get already assigned PDFs for this subjectCode
+//     // const assignedPdfs = await AnswerPdf.find({
+//     //   taskId: { $in: await Task.find({ subjectCode }).select("_id") },
+//     // });
+
+//     // const assignedPdfNames = assignedPdfs.map((pdf) => pdf.answerPdfName);
+
+//     // // Find unassigned PDFs
+//     // const unassignedPdfs = allPdfs.filter(
+//     //   (pdf) => !assignedPdfNames.includes(pdf)
+//     // );
+
+//     // if (unassignedPdfs.length === 0) {
+//     //   return res
+//     //     .status(400)
+//     //     .json({ message: "All booklets are already assigned." });
+//     // }
+//     // SAME PDF CAN BE ASSIGNED TO MULTIPLE EVALUATORS
+
+//     const taskIds = await Task.find({ userId }).distinct("_id");
+
+//     console.log("taskIds", taskIds);
+
+//     const startOfDay = new Date();
+//     startOfDay.setHours(0, 0, 0, 0);
+
+//     const endOfDay = new Date();
+//     endOfDay.setHours(23, 59, 59, 999);
+
+//     const todayPending = await AnswerPdf.countDocuments({
+//       taskId: { $in: taskIds },
+//       status: "false",
+//       assignedDate: { $gte: startOfDay, $lte: endOfDay },
+//     }).session(session);
+
+//     // validate total assignment limit
+//     // if (previouslyAssigned + Number(bookletsToAssign) > user.maxBooklets) {
+//     //   return res.status(400).json({
+//     //     message: `User can be assigned maximum ${user.maxBooklets} booklets. Already assigned ${previouslyAssigned}, requested ${bookletsToAssign}.`,
+//     //   });
+//     // }
+
+//     const dailyLimit = user.maxBooklets; // per-day limit
+//     const availableToday = Math.max(0, dailyLimit - todayPending);
+
+//     if (Number(bookletsToAssign) > availableToday) {
+//       return res.status(400).json({
+//         message: `Daily limit exceeded. Available today: ${availableToday}, requested: ${bookletsToAssign}`,
+//       });
+//     }
+
+//     console.log("allpdfs", allPdfs.length);
+
+//     const pdfsToBeAssigned = allPdfs.slice(0, bookletsToAssign);
+
+//     console.log("pdfsToBeAssigned", pdfsToBeAssigned.length);
+
+//     if (pdfsToBeAssigned.length === 0) {
+//       return res.status(400).json({ message: "No PDFs found to assign." });
+//     }
+
+//     // Determine the number of PDFs to assign in this request
+
+//     // Create a new task for this assignment
+//     let task = await Task.findOne({
+//       userId: user._id,
+//       subjectCode,
+//     }).session(session);
+
+//     // If NO existing task → create one
+//     // if (!task) {
+//     //   task = new Task({
+//     //     subjectCode,
+//     //     userId: user._id,
+//     //     questionDefinitionId: questionDefinitionId,
+//     //     totalBooklets: 0,
+//     //     status: "inactive",
+//     //     currentFileIndex: 1,
+//     //   });
+
+//     //   await task.save({ session });
+//     // }
+//     if (task) {
+//       task.questiondefinitionId = questiondefinitionId; // ✅ FIX
+//     } else {
+//       task = new Task({
+//         subjectCode,
+//         userId: user._id,
+//         questiondefinitionId,
+//         totalBooklets: 0,
+//         status: "inactive",
+//         currentFileIndex: 1,
+//       });
+//     }
+
+//     await task.save({ session });
+
+//     // Increase task booklet count
+//     task.totalBooklets += pdfsToBeAssigned.length;
+//     await task.save({ session });
+
+//     // Save the assigned PDFs in the AnswerPdf model
+//     const answerPdfDocs = pdfsToBeAssigned.map((pdf) => ({
+//       taskId: task._id,
+//       answerPdfName: pdf,
+//       status: "false",
+//       assignedDate: new Date(),
+//     }));
+
+//     await AnswerPdf.insertMany(answerPdfDocs, { session });
+
+//     // =========================
+//     //   GLOBAL COUNTS LOGIC
+//     // =========================
+
+//     // 1️⃣ All tasks created for this subject (GLOBAL)
+//     const subjectTaskIds = await Task.find({ subjectCode })
+//       .session(session)
+//       .distinct("_id");
+
+//     const allocated = await AnswerPdf.countDocuments({
+//       taskId: { $in: subjectTaskIds },
+//     }).session(session);
+//     console.log("GLOBAL allocated:", allocated);
+
+//     // 3️⃣ evaluation_pending = ALL PDFs where status:false (GLOBAL)
+//     const evaluation_pending = await AnswerPdf.countDocuments({
+//       taskId: { $in: subjectTaskIds },
+//       status: "false",
+//     }).session(session);
+
+//     // 4️⃣ evaluated = ALL PDFs where status:true (GLOBAL)
+//     const evaluated = await AnswerPdf.countDocuments({
+//       taskId: { $in: subjectTaskIds },
+//       status: "true",
+//     }).session(session);
+
+//     // 5️⃣ unAllocated = total PDFs - allocated
+//     let unAllocated = allPdfs.length - allocated;
+//     if (unAllocated < 0) unAllocated = 0;
+
+//     console.log("GLOBAL allocated:", allocated);
+//     console.log("GLOBAL evaluation_pending:", evaluation_pending);
+//     console.log("GLOBAL evaluated:", evaluated);
+//     console.log("GLOBAL unAllocated:", unAllocated);
+
+//     // 6️⃣ Update subject folder document
+//     await SubjectFolderModel.findOneAndUpdate(
+//       { folderName: subjectCode },
+//       {
+//         $set: {
+//           allocated,
+//           evaluation_pending,
+//           evaluated,
+//           unAllocated,
+//           updatedAt: new Date(),
+//         },
+//       },
+//       { session },
+//     );
+
+//     await session.commitTransaction();
+
+//     return res.status(201).json({
+//       message: `${pdfsToBeAssigned.length} Booklets assigned successfully.`,
+//       assignedPdfs: pdfsToBeAssigned,
+//     });
+//   } catch (error) {
+//     session.endSession();
+//     console.error("Error assigning task:", error);
+//     return res
+//       .status(500)
+//       .json({ error: "An error occurred while assigning the task." });
+//   }
+// };
+
 const assigningTask = async (req, res) => {
-  const { userId, subjectCode, questiondefinitionId, bookletsToAssign } =
-    req.body;
-  console.log(
-    "userId,  subjectCode,questionDefinitionId, bookletsToAssign",
-    userId,
-    subjectCode,
-    questiondefinitionId,
-    bookletsToAssign,
-  );
+  // 1. Extract the assignments array from the new payload structure
+  const { assignments } = req.body;
+
+  console.log("assognments", assignments);
+
+  if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
+    return res.status(400).json({ message: "No assignments data provided." });
+  }
 
   const session = await mongoose.startSession();
 
   try {
     session.startTransaction();
 
-    if (!userId || !subjectCode || !questiondefinitionId || !bookletsToAssign) {
-      return res.status(400).json({ message: "All fields are required" });
+    // Track assigned PDFs across all users in this request to return in response
+    const allAssignedInThisRequest = [];
+    // Store the subjectCode from the first assignment (assuming batch is same subject)
+    // If subjects differ per assignment, move folder logic inside the loop
+    const primarySubjectCode = assignments[0].subjectCode;
+
+    // 2. Loop through each assignment in the payload
+    for (const item of assignments) {
+      const { userId, subjectCode, questiondefinitionId, bookletsToAssign } = item;
+
+      // Basic validation for each item
+      if (!userId || !subjectCode || !questiondefinitionId || bookletsToAssign === undefined) {
+        throw new Error(`Missing fields for user: ${userId}`);
+      }
+
+      const user = await User.findById(userId).session(session);
+      if (!user) throw new Error(`User not found: ${userId}`);
+
+      // Folder and PDF logic (Assuming files are in processedFolder/subjectCode)
+      const subjectFolder = path.join(__dirname, "processedFolder", subjectCode);
+      if (!fs.existsSync(subjectFolder)) {
+        throw new Error(`Subject folder not found for ${subjectCode}`);
+      }
+
+      const allPdfs = fs.readdirSync(subjectFolder).filter((file) => file.endsWith(".pdf"));
+
+      // 3. Daily Limit Validation
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const taskIds = await Task.find({ userId }).distinct("_id").session(session);
+      const todayPending = await AnswerPdf.countDocuments({
+        taskId: { $in: taskIds },
+        status: "false",
+        assignedDate: { $gte: startOfDay, $lte: endOfDay },
+      }).session(session);
+
+      const availableToday = Math.max(0, user.maxBooklets - todayPending);
+      if (Number(bookletsToAssign) > availableToday) {
+        throw new Error(`Daily limit exceeded for user ${user.email}. Available: ${availableToday}`);
+      }
+
+      // 4. PDF Selection 
+      // Note: If you want to ensure the SAME PDF isn't assigned to the SAME user twice, 
+      // you may need to filter 'allPdfs' based on existing AnswerPdf records.
+      const pdfsToBeAssigned = allPdfs.slice(0, bookletsToAssign);
+      if (pdfsToBeAssigned.length === 0) {
+        throw new Error(`No PDFs found to assign for subject ${subjectCode}`);
+      }
+
+      // 5. Task Upsert
+      let task = await Task.findOne({ userId, subjectCode }).session(session);
+      if (task) {
+        task.questiondefinitionId = questiondefinitionId;
+        task.totalBooklets += pdfsToBeAssigned.length;
+      } else {
+        task = new Task({
+          subjectCode,
+          userId,
+          questiondefinitionId,
+          totalBooklets: pdfsToBeAssigned.length,
+          status: "inactive",
+          currentFileIndex: 1,
+        });
+      }
+      await task.save({ session });
+
+      // 6. Create AnswerPdf Records
+      const answerPdfDocs = pdfsToBeAssigned.map((pdf) => ({
+        taskId: task._id,
+        answerPdfName: pdf,
+        status: "false",
+        assignedDate: new Date(),
+      }));
+
+      await AnswerPdf.insertMany(answerPdfDocs, { session });
+      allAssignedInThisRequest.push(...pdfsToBeAssigned);
     }
 
-    if (!isValidObjectId(userId)) {
-      return res.status(400).json({ message: "Invalid user ID." });
-    }
-
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const subjectCodes = user.subjectCode;
-
-    if (!subjectCodes || subjectCodes.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No subjects found for the user." });
-    }
-
-    const subjectDetails = await Subject.find({ _id: { $in: subjectCodes } });
-    // console.log("subjectDetails", subjectDetails);
-
-    // If no subjects found
-    if (subjectDetails.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No subjects found for the given IDs." });
-    }
-
-    // Check if the subject code exists
-    const subject = subjectDetails.find(
-      (subject) => subject.code === subjectCode,
-    );
-
-    if (!subject) {
-      return res.status(404).json({
-        message: "Subject not found (upload master and question booklet).",
-      });
-    }
-
-    // Check if the folder for the subject code exists
-    const rootFolder = path.join(__dirname, "processedFolder");
-    const subjectFolder = path.join(rootFolder, subjectCode);
-
-    if (!fs.existsSync(subjectFolder)) {
-      return res.status(404).json({ message: "Subject folder not found." });
-    }
-
-    // Get all PDFs in the folder
-    const allPdfs = fs
-      .readdirSync(subjectFolder)
-      .filter((file) => file.endsWith(".pdf"));
-
-    // Get already assigned PDFs for this subjectCode
-    // const assignedPdfs = await AnswerPdf.find({
-    //   taskId: { $in: await Task.find({ subjectCode }).select("_id") },
-    // });
-
-    // const assignedPdfNames = assignedPdfs.map((pdf) => pdf.answerPdfName);
-
-    // // Find unassigned PDFs
-    // const unassignedPdfs = allPdfs.filter(
-    //   (pdf) => !assignedPdfNames.includes(pdf)
-    // );
-
-    // if (unassignedPdfs.length === 0) {
-    //   return res
-    //     .status(400)
-    //     .json({ message: "All booklets are already assigned." });
-    // }
-    // SAME PDF CAN BE ASSIGNED TO MULTIPLE EVALUATORS
-
-    const taskIds = await Task.find({ userId }).distinct("_id");
-
-    console.log("taskIds", taskIds);
-
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const todayPending = await AnswerPdf.countDocuments({
-      taskId: { $in: taskIds },
-      status: "false",
-      assignedDate: { $gte: startOfDay, $lte: endOfDay },
-    }).session(session);
-
-    // validate total assignment limit
-    // if (previouslyAssigned + Number(bookletsToAssign) > user.maxBooklets) {
-    //   return res.status(400).json({
-    //     message: `User can be assigned maximum ${user.maxBooklets} booklets. Already assigned ${previouslyAssigned}, requested ${bookletsToAssign}.`,
-    //   });
-    // }
-
-    const dailyLimit = user.maxBooklets; // per-day limit
-    const availableToday = Math.max(0, dailyLimit - todayPending);
-
-    if (Number(bookletsToAssign) > availableToday) {
-      return res.status(400).json({
-        message: `Daily limit exceeded. Available today: ${availableToday}, requested: ${bookletsToAssign}`,
-      });
-    }
-
-    console.log("allpdfs", allPdfs.length);
-
-    const pdfsToBeAssigned = allPdfs.slice(0, bookletsToAssign);
-
-    console.log("pdfsToBeAssigned", pdfsToBeAssigned.length);
-
-    if (pdfsToBeAssigned.length === 0) {
-      return res.status(400).json({ message: "No PDFs found to assign." });
-    }
-
-    // Determine the number of PDFs to assign in this request
-
-    // Create a new task for this assignment
-    let task = await Task.findOne({
-      userId: user._id,
-      subjectCode,
-    }).session(session);
-
-    // If NO existing task → create one
-    // if (!task) {
-    //   task = new Task({
-    //     subjectCode,
-    //     userId: user._id,
-    //     questionDefinitionId: questionDefinitionId,
-    //     totalBooklets: 0,
-    //     status: "inactive",
-    //     currentFileIndex: 1,
-    //   });
-
-    //   await task.save({ session });
-    // }
-    if (task) {
-      task.questiondefinitionId = questiondefinitionId; // ✅ FIX
-    } else {
-      task = new Task({
-        subjectCode,
-        userId: user._id,
-        questiondefinitionId,
-        totalBooklets: 0,
-        status: "inactive",
-        currentFileIndex: 1,
-      });
-    }
-
-    await task.save({ session });
-
-    // Increase task booklet count
-    task.totalBooklets += pdfsToBeAssigned.length;
-    await task.save({ session });
-
-    // Save the assigned PDFs in the AnswerPdf model
-    const answerPdfDocs = pdfsToBeAssigned.map((pdf) => ({
-      taskId: task._id,
-      answerPdfName: pdf,
-      status: "false",
-      assignedDate: new Date(),
-    }));
-
-    await AnswerPdf.insertMany(answerPdfDocs, { session });
-
-    // =========================
-    //   GLOBAL COUNTS LOGIC
-    // =========================
-
-    // 1️⃣ All tasks created for this subject (GLOBAL)
-    const subjectTaskIds = await Task.find({ subjectCode })
+    // 7. Update Global Counts (Outside the loop for efficiency)
+    // We update based on the primarySubjectCode from the batch
+    const subjectTaskIds = await Task.find({ subjectCode: primarySubjectCode })
       .session(session)
       .distinct("_id");
 
-    const allocated = await AnswerPdf.countDocuments({
-      taskId: { $in: subjectTaskIds },
-    }).session(session);
-    console.log("GLOBAL allocated:", allocated);
+    const allocated = await AnswerPdf.countDocuments({ taskId: { $in: subjectTaskIds } }).session(session);
+    const evaluation_pending = await AnswerPdf.countDocuments({ taskId: { $in: subjectTaskIds }, status: "false" }).session(session);
+    const evaluated = await AnswerPdf.countDocuments({ taskId: { $in: subjectTaskIds }, status: "true" }).session(session);
 
-    // 3️⃣ evaluation_pending = ALL PDFs where status:false (GLOBAL)
-    const evaluation_pending = await AnswerPdf.countDocuments({
-      taskId: { $in: subjectTaskIds },
-      status: "false",
-    }).session(session);
+    // Get folder count again for unAllocated math
+    const primaryFolder = path.join(__dirname, "processedFolder", primarySubjectCode);
+    const totalFiles = fs.readdirSync(primaryFolder).filter(f => f.endsWith(".pdf")).length;
 
-    // 4️⃣ evaluated = ALL PDFs where status:true (GLOBAL)
-    const evaluated = await AnswerPdf.countDocuments({
-      taskId: { $in: subjectTaskIds },
-      status: "true",
-    }).session(session);
-
-    // 5️⃣ unAllocated = total PDFs - allocated
-    let unAllocated = allPdfs.length - allocated;
-    if (unAllocated < 0) unAllocated = 0;
-
-    console.log("GLOBAL allocated:", allocated);
-    console.log("GLOBAL evaluation_pending:", evaluation_pending);
-    console.log("GLOBAL evaluated:", evaluated);
-    console.log("GLOBAL unAllocated:", unAllocated);
-
-    // 6️⃣ Update subject folder document
     await SubjectFolderModel.findOneAndUpdate(
-      { folderName: subjectCode },
+      { folderName: primarySubjectCode },
       {
         $set: {
           allocated,
           evaluation_pending,
           evaluated,
-          unAllocated,
+          unAllocated: Math.max(0, totalFiles - allocated),
           updatedAt: new Date(),
         },
       },
-      { session },
+      { session }
     );
 
     await session.commitTransaction();
-
     return res.status(201).json({
-      message: `${pdfsToBeAssigned.length} Booklets assigned successfully.`,
-      assignedPdfs: pdfsToBeAssigned,
+      message: "Batch assignment successful",
+      assignedCount: allAssignedInThisRequest.length,
     });
+
   } catch (error) {
-    session.endSession();
+    if (session.inTransaction()) {
+        await session.abortTransaction();
+    }
     console.error("Error assigning task:", error);
-    return res
-      .status(500)
-      .json({ error: "An error occurred while assigning the task." });
+    return res.status(500).json({ error: error.message || "An error occurred." });
+  } finally {
+    session.endSession();
   }
 };
 
@@ -1264,6 +1547,252 @@ const autoAssigning = async (req, res) => {
   }
 };
 
+//In taskControllers.js Add this Function
+
+const getReviewerTask = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid task ID." });
+    }
+
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found." });
+    }
+
+    // 🔒 CHECK: same subject + same question assigned to another evaluator
+    const conflictingTask = await Task.findOne({
+      _id: { $ne: task._id }, // exclude current task
+      subjectCode: task.subjectCode,
+      questiondefinitionId: task.questiondefinitionId,
+      status: { $ne: "success" }, // not completed yet
+    });
+
+    if (conflictingTask) {
+      return res.status(200).json({
+        task,
+        status: "active",
+        blocked: true,
+        message:
+          "Ye question pehle se kisi aur evaluator ko assigned hai aur uska task abhi complete nahi hua.",
+      });
+    }
+
+    // Initialize task timing
+    if (!task.startTime) {
+      task.startTime = new Date();
+      task.lastResumedAt = new Date();
+      task.status = "active";
+      await task.save();
+    }
+
+    const subject = await Subject.findOne({ code: task.subjectCode });
+    if (!subject) {
+      return res
+        .status(404)
+        .json({ message: "Subject not found (create subject)." });
+    }
+
+    const courseSchemaRel = await SubjectSchemaRelation.findOne({
+      subjectId: subject._id,
+    });
+    if (!courseSchemaRel) {
+      return res.status(404).json({
+        message:
+          "Schema not found for subject (upload master answer and master question).",
+      });
+    }
+
+    const schemaDetails = await Schema.findById(courseSchemaRel.schemaId);
+    if (!schemaDetails) {
+      return res.status(404).json({ message: "Schema not found." });
+    }
+
+    const minTime = schemaDetails.minTime;
+    const maxTime = schemaDetails.maxTime;
+
+    // Calculate remaining time
+    let remainingSeconds = 0;
+    if (task.status === "paused" && task.remainingTimeInSec != null) {
+      remainingSeconds = task.remainingTimeInSec;
+      task.lastResumedAt = new Date();
+      task.status = "active";
+      await task.save();
+    } else if (task.status === "active" && task.lastResumedAt) {
+      const elapsedSeconds = Math.floor(
+        (new Date() - task.lastResumedAt) / 1000,
+      );
+      remainingSeconds = Math.max(
+        (task.remainingTimeInSec ?? maxTime * 60) - elapsedSeconds,
+        0,
+      );
+    } else {
+      remainingSeconds = maxTime * 60;
+    }
+
+    // Folder setup
+    const rootFolder = path.join(__dirname, "processedFolder");
+    const subjectFolder = path.join(rootFolder, task.subjectCode);
+
+    if (!fs.existsSync(subjectFolder)) {
+      return res.status(404).json({ message: "Subject folder not found." });
+    }
+
+    const extractedBookletsFolder = path.join(
+      subjectFolder,
+      "extractedBooklets",
+    );
+    if (!fs.existsSync(extractedBookletsFolder)) {
+      fs.mkdirSync(extractedBookletsFolder, { recursive: true });
+    }
+
+    // Get assigned PDFs
+    const assignedPdfs = await AnswerPdf.find({ taskId: task._id });
+
+    // Update pending PDFs to "progress"
+    await AnswerPdf.updateMany(
+      { taskId: task._id, status: "false" },
+      { $set: { status: "progress" } },
+    );
+
+    if (assignedPdfs.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No PDFs assigned to this task." });
+    }
+
+    console.log(`📊 TOTAL PDFS ASSIGNED: ${assignedPdfs.length}`);
+
+    const currentPdf = assignedPdfs[task.currentFileIndex - 1];
+    if (!currentPdf) {
+      return res
+        .status(404)
+        .json({ message: "No PDF found for the current file index." });
+    }
+
+    console.log(`📄 CURRENT PDF: ${currentPdf.answerPdfName}`);
+    console.log(`📁 Current File Index: ${task.currentFileIndex}`);
+
+    const pdfPath = path.join(subjectFolder, currentPdf.answerPdfName);
+    if (!fs.existsSync(pdfPath)) {
+      return res.status(404).json({
+        message: `PDF file ${currentPdf.answerPdfName} not found.`,
+      });
+    }
+
+    const bookletName = path.basename(currentPdf.answerPdfName, ".pdf");
+
+    const currentPdfFolder = path.join(extractedBookletsFolder, bookletName);
+
+    let extractedBookletPath = `processedFolder/${task.subjectCode}/extractedBooklets/${bookletName}`;
+
+    // ✅ Build base URL for HTTP access
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+    const questionImagesFolderUrl = `processedFolder/${task.subjectCode}/extractedBooklets/${bookletName}/questionImages/${task.questiondefinitionId}`;
+
+    // ✅ Check if images already extracted
+    let extractedImages = await AnswerPdfImage.find({
+      answerPdfId: currentPdf._id,
+    });
+
+    console.log(
+      `🖼️ EXISTING EXTRACTED IMAGES IN DATABASE: ${extractedImages.length}`,
+    );
+
+    // ✅ If no images, extract them from PDF
+    if (extractedImages.length === 0) {
+      console.log("📤 Extracting images from PDF for the first time...");
+
+      if (!fs.existsSync(currentPdfFolder)) {
+        fs.mkdirSync(currentPdfFolder, { recursive: true });
+      }
+
+      const imageFiles = await extractImagesFromPdf(pdfPath, currentPdfFolder);
+
+      const imageDocs = imageFiles.map((imageFileName, i) => ({
+        answerPdfId: currentPdf._id,
+        name: imageFileName,
+        status: i === 0 ? "visited" : "notVisited",
+      }));
+
+      extractedImages = await AnswerPdfImage.insertMany(imageDocs);
+      console.log(`✅ Extracted ${extractedImages.length} images from PDF`);
+    }
+
+    // ✅ Validate questionDefinitionId
+    if (!task.questiondefinitionId) {
+      return res.status(400).json({
+        message: "Task missing questionDefinitionId",
+      });
+    }
+
+    console.log("questionDefinitionId:", task.questiondefinitionId.toString());
+
+    // ✅ Get question definition
+    const questionDef = await QuestionDefinition.findById(
+      task.questiondefinitionId,
+    );
+
+    if (!questionDef || !questionDef.coordinates) {
+      return res.status(404).json({
+        message: "QuestionDefinition or coordinates not found",
+      });
+    }
+
+    console.log(
+      "Question coordinates:",
+      JSON.stringify(questionDef.coordinates, null, 2),
+    );
+
+    // ✅ Extract question images
+    const questionImagesFolder = path.join(
+      currentPdfFolder,
+      "questionImages",
+      String(task.questiondefinitionId),
+    );
+
+    console.log("📁 Question images output folder:", questionImagesFolder);
+
+    const questionImages = await extractQuestionImages(
+      questionDef.coordinates, // wholePages + partialAreas
+      extractedImages, // page images from DB
+      currentPdfFolder, // source folder
+      questionImagesFolder, // output folder
+    );
+
+    console.log(`✅ Question images extracted: ${questionImages.length}`);
+
+    // ✅ ADD URLs TO EACH QUESTION IMAGE
+    const questionImagesWithUrls = questionImages.map((img) => ({
+      ...img,
+      url: `${questionImagesFolderUrl}/${img.image}`,
+    }));
+
+    // ✅ Return response with question images
+    return res.status(200).json({
+      task,
+      questionDef,
+      remainingSeconds,
+      answerPdfDetails: currentPdf,
+      schemaDetails,
+      extractedBookletPath,
+      questionImagesPath: `${extractedBookletPath}/questionImages/${task.questiondefinitionId}`,
+      questionImagesFolderUrl, // ✅ Folder URL
+      questionImages: questionImagesWithUrls, // ✅ Images with individual URLs
+    });
+  } catch (error) {
+    console.error("❌ Error fetching task:", error.message);
+    console.error(error.stack);
+    res.status(500).json({
+      message: "Failed to process task",
+      error: error.message,
+    });
+  }
+};
+
 // const pauseTask = async (req, res) => {
 //   const { id } = req.params;
 
@@ -1795,8 +2324,9 @@ const getAssignTaskById = async (req, res) => {
 
     // ✅ Check if images already extracted
     let extractedImages = await AnswerPdfImage.find({
-      answerPdfId: currentPdf._id,
-    });
+  answerPdfId: currentPdf._id,
+  questiondefinitionId: task.questiondefinitionId   // ← ADD THIS
+}).sort({ page: 1 });
 
     console.log(
       `🖼️ EXISTING EXTRACTED IMAGES IN DATABASE: ${extractedImages.length}`,
@@ -1816,40 +2346,35 @@ const getAssignTaskById = async (req, res) => {
         fs.mkdirSync(currentPdfFolder, { recursive: true });
       }
 
-      const imageFiles = await extractImagesFromPdf(pdfPath, currentPdfFolder);
-
-      // 1️⃣ Check existence
-      const alreadyExists = await AnswerPdfImage.exists({
-        answerPdfId: currentPdf._id,
-        questiondefinitionId: questionDef._id,
-      });
-
-      if (alreadyExists) {
-        console.log("ℹ️ Skipping insert — images already exist");
-        return;
-      }
+      const imageFiles = await extractImagesFromPdf(pdfPath, currentPdfFolder); // still all pages
 
       const imageDocs = imageFiles
         .map((imageFileName) => {
-          const match = imageFileName.match(/(\d+)/);
+          const match = imageFileName.match(/image_(\d+)\.png$/);
           if (!match) return null;
-
           const pageNumber = parseInt(match[1], 10);
+
+          // Only save pages that belong to this question
           if (!questionPages.has(pageNumber)) return null;
 
           return {
             answerPdfId: currentPdf._id,
             questiondefinitionId: questionDef._id,
-
             name: imageFileName,
+            page: pageNumber,
+            // ← add this field to schema if not already
             status: "notVisited",
           };
         })
         .filter(Boolean);
 
-      extractedImages = await AnswerPdfImage.insertMany(imageDocs);
+      if (imageDocs.length === 0) {
+        console.warn(
+          "No pages match this question definition → possible config error",
+        );
+      }
 
-      console.log(`✅ Inserted ${extractedImages.length} question images`);
+      extractedImages = await AnswerPdfImage.insertMany(imageDocs);
 
       // const imageDocs = imageFiles.map((imageFileName, ) => ({
       //   answerPdfId: currentPdf._id,
@@ -1894,11 +2419,18 @@ const getAssignTaskById = async (req, res) => {
 
     console.log("📁 Question images output folder:", questionImagesFolder);
 
+    // When calling extractQuestionImages
+    const relevantImages = extractedImages.filter((img) =>
+      questionPages.has(img.page),
+    );
+
+    console.log("relevantImages:",relevantImages );
+
     const questionImages = await extractQuestionImages(
-      questionDef.coordinates, // wholePages + partialAreas
-      extractedImages, // page images from DB
-      currentPdfFolder, // source folder
-      questionImagesFolder, // output folder
+      questionDef.coordinates,
+      relevantImages, // ← only pages of this question
+      currentPdfFolder,
+      questionImagesFolder,
     );
 
     console.log(`✅ Question images extracted: ${questionImages.length}`);
@@ -2654,4 +3186,5 @@ export {
   editTaskHandler,
   autoAssigning,
   rejectBooklet,
+  getReviewerTask
 };
