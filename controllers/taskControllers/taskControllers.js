@@ -726,7 +726,7 @@ const assigningTask = async (req, res) => {
       const answerPdfDocs = pdfsToBeAssigned.map((pdf) => ({
         taskId: task._id,
         answerPdfName: pdf,
-        questiondefinitionId:task.questiondefinitionId,
+        questiondefinitionId: task.questiondefinitionId,
         status: "false",
         assignedDate: new Date(),
       }));
@@ -817,7 +817,7 @@ const reassignPendingBooklets = async (req, res) => {
     }
 
     // 🔒 RULE 1: Task must be inactive or active
-    if (!["inactive", "active"].includes(fromTask.status)) {
+    if (!["inactive", "active", "success"].includes(fromTask.status)) {
       return res.status(400).json({
         message: "Completed task booklets cannot be reassigned",
       });
@@ -839,6 +839,30 @@ const reassignPendingBooklets = async (req, res) => {
         currentFileIndex: 1,
       });
       await toTask.save({ session });
+    }
+
+    if (toUserId.role === "reviewer") {
+      // ← here toUserId is the populated user
+
+       // extract the real ID
+
+      let toTask = await Task.findOne({
+        userId: toUserId,
+        subjectCode: fromTask.subjectCode,
+      }).session(session);
+
+      if (!toTask) {
+        toTask = new Task({
+          subjectCode: fromTask.subjectCode,
+          userId: reviewerId,
+          questiondefinitionId: fromTask.questiondefinitionId, // critical
+          totalBooklets: 0,
+          status: "inactive",
+          currentFileIndex: 1,
+        });
+
+        await toTask.save({ session });
+      }
     }
 
     // 🔹 FETCH ONLY PENDING (status:false) PDFs
@@ -1239,11 +1263,13 @@ const getUserCurrentTaskStatus = async (req, res) => {
 
       const completedBooklets = await AnswerPdf.countDocuments({
         taskId: task._id,
+        questiopndefinitionId: task.questiondefinitionId,
         status: "true",
       });
 
       const pendingBooklets = await AnswerPdf.countDocuments({
         taskId: task._id,
+        questiondefinitionId: task.questiondefinitionId,
         status: "false",
       });
 
@@ -1600,12 +1626,14 @@ const getReviewerTask = async (req, res) => {
       return res.status(404).json({ message: "Task not found." });
     }
 
-    // 🔒 CHECK: same subject + same question assigned to another evaluator
+    /* -------------------------------------------------------------------------- */
+    /*                         🔒 REVIEWER BLOCK CHECK                            */
+    /* -------------------------------------------------------------------------- */
     const conflictingTask = await Task.findOne({
-      _id: { $ne: task._id }, // exclude current task
+      _id: { $ne: task._id },
       subjectCode: task.subjectCode,
       questiondefinitionId: task.questiondefinitionId,
-      status: { $ne: "success" }, // not completed yet
+      status: { $ne: "success" },
     });
 
     if (conflictingTask) {
@@ -1618,7 +1646,9 @@ const getReviewerTask = async (req, res) => {
       });
     }
 
-    // Initialize task timing
+    /* -------------------------------------------------------------------------- */
+    /*                            ⏱️ TASK TIMING LOGIC                             */
+    /* -------------------------------------------------------------------------- */
     if (!task.startTime) {
       task.startTime = new Date();
       task.lastResumedAt = new Date();
@@ -1648,10 +1678,8 @@ const getReviewerTask = async (req, res) => {
       return res.status(404).json({ message: "Schema not found." });
     }
 
-    const minTime = schemaDetails.minTime;
     const maxTime = schemaDetails.maxTime;
 
-    // Calculate remaining time
     let remainingSeconds = 0;
     if (task.status === "paused" && task.remainingTimeInSec != null) {
       remainingSeconds = task.remainingTimeInSec;
@@ -1670,7 +1698,9 @@ const getReviewerTask = async (req, res) => {
       remainingSeconds = maxTime * 60;
     }
 
-    // Folder setup
+    /* -------------------------------------------------------------------------- */
+    /*                             📂 FOLDER SETUP                             */
+    /* -------------------------------------------------------------------------- */
     const rootFolder = path.join(__dirname, "processedFolder");
     const subjectFolder = path.join(rootFolder, task.subjectCode);
 
@@ -1686,142 +1716,118 @@ const getReviewerTask = async (req, res) => {
       fs.mkdirSync(extractedBookletsFolder, { recursive: true });
     }
 
-    // Get assigned PDFs
+    /* -------------------------------------------------------------------------- */
+    /*                             📄 ASSIGNED PDF LOGIC                            */
+    /* -------------------------------------------------------------------------- */
     const assignedPdfs = await AnswerPdf.find({ taskId: task._id });
 
-    // Update pending PDFs to "progress"
     await AnswerPdf.updateMany(
       { taskId: task._id, status: "false" },
       { $set: { status: "progress" } },
     );
 
-    if (assignedPdfs.length === 0) {
+    if (!assignedPdfs.length) {
       return res
         .status(404)
         .json({ message: "No PDFs assigned to this task." });
     }
 
-    console.log(`📊 TOTAL PDFS ASSIGNED: ${assignedPdfs.length}`);
-
     const currentPdf = assignedPdfs[task.currentFileIndex - 1];
     if (!currentPdf) {
       return res
         .status(404)
-        .json({ message: "No PDF found for the current file index." });
+        .json({ message: "No PDF found for current index." });
     }
-
-    console.log(`📄 CURRENT PDF: ${currentPdf.answerPdfName}`);
-    console.log(`📁 Current File Index: ${task.currentFileIndex}`);
-
-    // ✅ FETCH MARKS FOR THIS PDF + QUESTION
-    const marksDoc = await Marks.findOne({
-      answerPdfId: currentPdf._id,
-      questionDefinitionId: task.questiondefinitionId,
-    }).lean();
-
-    const allottedMarks = marksDoc?.allottedMarks ?? 0;
 
     const pdfPath = path.join(subjectFolder, currentPdf.answerPdfName);
     if (!fs.existsSync(pdfPath)) {
       return res.status(404).json({
-        message: `PDF file ${currentPdf.answerPdfName} not found.`,
+        message: `PDF ${currentPdf.answerPdfName} not found.`,
       });
     }
 
     const bookletName = path.basename(currentPdf.answerPdfName, ".pdf");
-
     const currentPdfFolder = path.join(extractedBookletsFolder, bookletName);
 
-    let extractedBookletPath = `processedFolder/${task.subjectCode}/extractedBooklets/${bookletName}`;
-
-    // ✅ Build base URL for HTTP access
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const extractedBookletPath = `processedFolder/${task.subjectCode}/extractedBooklets/${bookletName}`;
 
     const questionImagesFolderUrl = `processedFolder/${task.subjectCode}/extractedBooklets/${bookletName}/questionImages/${task.questiondefinitionId}`;
 
-    // ✅ Check if images already extracted
+    /* -------------------------------------------------------------------------- */
+    /*                         🖼️ IMAGE EXTRACTION LOGIC                         */
+    /* -------------------------------------------------------------------------- */
     let extractedImages = await AnswerPdfImage.find({
       answerPdfId: currentPdf._id,
-    });
+      questiondefinitionId: task.questiondefinitionId,
+    }).sort({ page: 1 });
 
-    console.log(
-      `🖼️ EXISTING EXTRACTED IMAGES IN DATABASE: ${extractedImages.length}`,
+    const questionDef = await QuestionDefinition.findById(
+      task.questiondefinitionId,
     );
 
-    // ✅ If no images, extract them from PDF
-    if (extractedImages.length === 0) {
-      console.log("📤 Extracting images from PDF for the first time...");
+    const questionPages = new Set(questionDef.page);
 
+    if (extractedImages.length === 0) {
       if (!fs.existsSync(currentPdfFolder)) {
         fs.mkdirSync(currentPdfFolder, { recursive: true });
       }
 
       const imageFiles = await extractImagesFromPdf(pdfPath, currentPdfFolder);
 
-      const imageDocs = imageFiles.map((imageFileName, i) => ({
-        answerPdfId: currentPdf._id,
-        name: imageFileName,
-        status: i === 0 ? "visited" : "notVisited",
-      }));
+      const imageDocs = imageFiles
+        .map((img) => {
+          const match = img.match(/image_(\d+)\.png$/);
+          if (!match) return null;
+          const page = parseInt(match[1], 10);
+          if (!questionPages.has(page)) return null;
+
+          return {
+            answerPdfId: currentPdf._id,
+            questiondefinitionId: task.questiondefinitionId,
+            name: img,
+            page,
+            status: "notVisited",
+          };
+        })
+        .filter(Boolean);
 
       extractedImages = await AnswerPdfImage.insertMany(imageDocs);
-      console.log(`✅ Extracted ${extractedImages.length} images from PDF`);
     }
 
-    // ✅ Validate questionDefinitionId
-    if (!task.questiondefinitionId) {
-      return res.status(400).json({
-        message: "Task missing questionDefinitionId",
-      });
-    }
-
-    console.log("questionDefinitionId:", task.questiondefinitionId.toString());
-
-    // ✅ Get question definition
-    const questionDef = await QuestionDefinition.findById(
-      task.questiondefinitionId,
-    );
-
-    if (!questionDef || !questionDef.coordinates) {
-      return res.status(404).json({
-        message: "QuestionDefinition or coordinates not found",
-      });
-    }
-
-    console.log(
-      "Question coordinates:",
-      JSON.stringify(questionDef.coordinates, null, 2),
-    );
-
-    // ✅ Extract question images
     const questionImagesFolder = path.join(
       currentPdfFolder,
       "questionImages",
       String(task.questiondefinitionId),
     );
 
-    console.log("📁 Question images output folder:", questionImagesFolder);
-
-    const questionImages = await extractQuestionImages(
-      questionDef.coordinates, // wholePages + partialAreas
-      extractedImages, // page images from DB
-      currentPdfFolder, // source folder
-      questionImagesFolder, // output folder
+    const relevantImages = extractedImages.filter((img) =>
+      questionPages.has(img.page),
     );
 
-    console.log(`✅ Question images extracted: ${questionImages.length}`);
+    const questionImages = await extractQuestionImages(
+      questionDef.coordinates,
+      relevantImages,
+      currentPdfFolder,
+      questionImagesFolder,
+    );
 
-    // ✅ ADD URLs TO EACH QUESTION IMAGE
     const questionImagesWithUrls = questionImages.map((img) => ({
       ...img,
       url: `${questionImagesFolderUrl}/${img.image}`,
     }));
 
-    // ✅ BUILD REVIEWER DATA (page + image + marks)
-    const reviewerQuestionData = {
+    /* -------------------------------------------------------------------------- */
+    /*                         🧮 REVIEWER EXTRA DATA                            */
+    /* -------------------------------------------------------------------------- */
+    const marksDoc = await Marks.findOne({
+      answerPdfId: currentPdf._id,
+      questionDefinitionId: task.questiondefinitionId,
+    }).lean();
+
+    const reviewerQuestion = {
       questionDefinitionId: task.questiondefinitionId,
       question: questionDef.question || questionDef.name || "",
-      allottedMarks,
+      allottedMarks: marksDoc?.allottedMarks ?? 0,
       pages: questionImagesWithUrls.map((img) => ({
         page: img.page,
         image: img.image,
@@ -1830,23 +1836,28 @@ const getReviewerTask = async (req, res) => {
       })),
     };
 
-    // ✅ Return response with question images
+    /* -------------------------------------------------------------------------- */
+    /*                             ✅ FINAL RESPONSE                             */
+    /* -------------------------------------------------------------------------- */
     return res.status(200).json({
       task,
+      questionDef,
       remainingSeconds,
       answerPdfDetails: currentPdf,
       schemaDetails,
-
-      reviewerQuestion: reviewerQuestionData, // 🔥 MAIN DATA
-
       extractedBookletPath,
       questionImagesPath: `${extractedBookletPath}/questionImages/${task.questiondefinitionId}`,
+      questionImagesFolderUrl,
+      questionImages: questionImagesWithUrls,
+
+      // 🔥 REVIEWER ONLY
+      reviewerQuestion,
     });
   } catch (error) {
-    console.error("❌ Error fetching task:", error.message);
+    console.error("❌ Error fetching reviewer task:", error.message);
     console.error(error.stack);
-    res.status(500).json({
-      message: "Failed to process task",
+    return res.status(500).json({
+      message: "Failed to process reviewer task",
       error: error.message,
     });
   }
@@ -2341,7 +2352,11 @@ const getAssignTaskById = async (req, res) => {
 
     // Update pending PDFs to "progress"
     await AnswerPdf.updateMany(
-      { taskId: task._id, status: "false" },
+      {
+        taskId: task._id,
+        questiondefinitionId: task.questiondefinitionId,
+        status: "false",
+      },
       { $set: { status: "progress" } },
     );
 
@@ -2756,6 +2771,7 @@ const getUsersFormanualAssign = async (req, res) => {
         name: user.name,
         email: user.email,
         maxBooklets: maximumBooklets,
+        role: user.role,
         assignedBooklets,
         remaining: maximumBooklets - assignedBooklets,
       });
@@ -3603,6 +3619,87 @@ const rejectBooklet = async (req, res) => {
   }
 };
 
+const reviewerRejectTask = async (req, res) => {
+  try {
+    const { questiondefinitionId, subjectCode, reviewerid, answerPdfId } =
+      req.body;
+
+    if (!questiondefinitionId || !subjectCode || !reviewerid || !answerPdfId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "All fields are required: questiondefinitionId, subjectCode, reviewerid, answerPdfId, Comment",
+      });
+    }
+
+    // pdf name , marks , question number, reason to reject
+
+    const pdf = await AnswerPdf.findOneAndUpdate(
+      {
+        _id: answerPdfId,
+        questiondefinitionId: questiondefinitionId, // important: must match
+      },
+      {
+        $set: {
+          status: "false", // or better: "rejected", "pending", etc.
+          // rejectionReason: "Your comment here",   // ← add if you have it
+          // rejectedAt: new Date(),
+        },
+      },
+    );
+    const pdfName = pdf.answerPdfName;
+
+    const marks = await Marks.findOne({
+      answerPdfId,
+      questiondefinitionId,
+    }).select("allottedMarks");
+
+    return res.status(200).json({
+      success: true,
+      message: "Booklet rejected successfully",
+      data: {
+        answerPdfId,
+        pdfName,
+        allottedMarks: marks,
+      },
+    });
+  } catch (error) {
+    console.error("Error in reviewerRejectTask:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while rejecting task",
+      error: error.message,
+    });
+  }
+};
+
+const getDataprincipalSide = async (req, res) => {
+  try {
+    
+
+    const pdfDetails = await AnswerPdf.find({
+  status: "false"
+})
+  .select("answerPdfName taskId questiondefinitionId status") // add fields you actually need
+  .sort({ assignedDate: -1 })           // newest first (optional but useful)
+  .lean();
+
+    return res.status(200).json({
+      sttatus: true,
+      data: {
+        pdfDetails,
+      },
+    });
+  } catch (error) {
+    console.error("Error in reviewerRejectTask:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while rejecting task",
+      error: error.message,
+    });
+  }
+};
+
 export {
   assigningTask,
   reassignPendingBooklets,
@@ -3622,4 +3719,6 @@ export {
   autoAssigning,
   rejectBooklet,
   getReviewerTask,
+  reviewerRejectTask,
+  getDataprincipalSide,
 };

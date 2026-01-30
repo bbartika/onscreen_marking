@@ -19,7 +19,10 @@ import {
     editTaskHandler,
     autoAssigning,
     rejectBooklet,
-    getReviewerTask
+    getReviewerTask,
+
+    reviewerRejectTask,
+    getDataprincipalSide
     // generatePdfForCompletedBooklet
 } from "../../controllers/taskControllers/taskControllers.js";
 
@@ -48,8 +51,13 @@ router.get("/subjectcode", getAllTasksBasedOnSubjectCode);
 router.post("/rejectbooklet/:answerPdfId", rejectBooklet);
 router.put("/completedbooklet/:answerpdfid/:userId", completedBookletHandler);
 
+router.post("/reviewer/rejectTask", reviewerRejectTask);
+
+router.get("/get/principalsideData", getDataprincipalSide)
+
 // router.post("/completeBooklet/generatePdf/:answerPdfId", generatePdfForCompletedBooklet);
 
 router.put("/checktaskcompletion/:id", checkTaskCompletionHandler);
 
 export default router;
+
