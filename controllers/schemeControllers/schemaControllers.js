@@ -41,7 +41,7 @@ const createSchema = async (req, res) => {
       !maxTime ||
       !numberOfPage ||
       !hiddenPage ||
-      !perPage  
+      !perPage
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -103,8 +103,8 @@ const createSchema = async (req, res) => {
       hiddenPage,
       isActive,
       status: false,
-      numberOfSupplement,
-      PageofSupplement,
+      numberOfSupplement: numberOfSupplement ? Number(numberOfSupplement) : 0,
+      PageofSupplement: PageofSupplement ? Number(PageofSupplement) : 0
     });
 
     const savedSchema = await newSchema.save();
@@ -136,7 +136,7 @@ const updateSchema = async (req, res) => {
     numberOfPage,
     hiddenPage,
     numberOfSupplement,
-    PageofSupplement,    
+    PageofSupplement,
     perPage,
   } = req.body;
 
@@ -167,8 +167,8 @@ const updateSchema = async (req, res) => {
       !minTime ||
       !maxTime ||
       !numberOfPage ||
-      !hiddenPage||
-      !perPage 
+      !hiddenPage ||
+      !perPage
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -660,7 +660,7 @@ const uploadAnswerPdf = async (req, res) => {
     const extractedImagesDir = path.join(
       baseDir,
       "extractedAnswerPdfImages",
-      schemaId.toString()
+      schemaId.toString(),
     );
 
     fs.mkdirSync(answerPdfDir, { recursive: true });
@@ -669,10 +669,7 @@ const uploadAnswerPdf = async (req, res) => {
     /* ================================
        MOVE PDF
     ================================= */
-    const finalPdfPath = path.join(
-      answerPdfDir,
-      `${answerPdfId}.pdf`
-    );
+    const finalPdfPath = path.join(answerPdfDir, `${answerPdfId}.pdf`);
 
     await fs.promises.rename(file.path, finalPdfPath);
 
@@ -701,19 +698,17 @@ const uploadAnswerPdf = async (req, res) => {
       try {
         const images = await extractImagesFromPdf(
           finalPdfPath,
-          extractedImagesDir
+          extractedImagesDir,
         );
 
         // OPTIONAL: store image count later if needed
         // await SchemaAnswerPdf.findByIdAndUpdate(answerPdfId, {
         //   imageCount: images.length
         // });
-
       } catch (err) {
         console.error("Answer PDF image extraction failed:", err);
       }
     });
-
   } catch (error) {
     console.error("uploadAnswerPdf error:", error);
     return res.status(500).json({
@@ -721,7 +716,6 @@ const uploadAnswerPdf = async (req, res) => {
     });
   }
 };
-
 
 /* -------------------------------------------------------------------------- */
 /*               New PDF Upload Pipeline Fetch Pipeline                       */
@@ -741,7 +735,7 @@ const getAnswerPdfImages = async (req, res) => {
       process.cwd(),
       "uploadedPdfs",
       "extractedAnswerPdfImages",
-      answerPdfId
+      answerPdfId,
     );
 
     if (!fs.existsSync(imagesDir)) {
@@ -792,7 +786,7 @@ const serveAnswerPdfImage = async (req, res) => {
       "uploadedPdfs",
       "extractedAnswerPdfImages",
       schemaId,
-      imageName
+      imageName,
     );
 
     if (!fs.existsSync(imagePath)) {

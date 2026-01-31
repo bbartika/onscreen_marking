@@ -20,7 +20,7 @@ import Subject from "../../models/classModel/subjectModel.js";
 import SubjectFolderModel from "../../models/StudentModels/subjectFolderModel.js";
 import Icon from "../../models/EvaluationModels/iconModel.js";
 import { subjectsWithTasks } from "../classControllers/subjectControllers.js";
-import ReviewerTask from "../../models/taskModels/reviewerTaskModel.js"
+import ReviewerTask from "../../models/taskModels/reviewerTaskModel.js";
 // import { ConversationsMessageFile } from "sib-api-v3-sdk";
 
 // const extractQuestionImages = async (
@@ -711,7 +711,7 @@ const assigningTask = async (req, res) => {
       if (task) {
         task.questiondefinitionId = questiondefinitionId;
         task.totalBooklets += pdfsToBeAssigned.length;
-        task.status = "inactive"
+        task.status = "inactive";
       } else {
         task = new Task({
           subjectCode,
@@ -797,150 +797,325 @@ const assigningTask = async (req, res) => {
   }
 };
 
+// const reassignPendingBooklets = async (req, res) => {
+//   const { fromTaskId, toUserId, transferCount, reassignedBy } = req.body;
+
+//   console.log("Reassignment request:", req.body);
+
+//   const session = await mongoose.startSession();
+
+//   try {
+//     session.startTransaction();
+
+//     if (!fromTaskId || !toUserId || !transferCount || transferCount <= 0) {
+//       return res.status(400).json({ message: "Invalid payload" });
+//     }
+
+//     // 🔹 SOURCE TASK
+//     const fromTask = await Task.findById(fromTaskId).session(session);
+
+//     if (!fromTask) {
+//       return res.status(404).json({ message: "Source task not found" });
+//     }
+
+//     // 🔒 RULE 1: Task must be inactive or active
+//     if (!["inactive", "active"].includes(fromTask.status)) {
+//       return res.status(400).json({
+//         message: "Completed task booklets cannot be reassigned",
+//       });
+//     }
+//     console.log("questiondefid:", fromTask.questiondefinitionId);
+
+//     // 🔹 TARGET TASK (same subjectCode)
+//     let toTask = await Task.findOne({
+//       userId: toUserId,
+//       subjectCode: fromTask.subjectCode,
+//       questiondefinitionId: fromTask.questiondefinitionId,
+//       status: { $ne: "success" },
+//     }).session(session);
+
+//     if (!toTask) {
+//       toTask = new Task({
+//         subjectCode: fromTask.subjectCode,
+//         questiondefinitionId: fromTask.questiondefinitionId,
+//         userId: toUserId,
+//         totalBooklets: 0,
+//         status: "inactive",
+//         currentFileIndex: 1,
+//       });
+//       await toTask.save({ session });
+//     }
+
+//     if (toUserId.role === "reviewer") {
+//       // ← here toUserId is the populated user
+
+//       // extract the real ID
+
+//       let toTask = await Task.findOne({
+//         userId: toUserId,
+//         subjectCode: fromTask.subjectCode,
+//         questiondefinitionId: fromTask.questiondefinitionId,
+//       }).session(session);
+
+//       if (!toTask) {
+//         toTask = new Task({
+//           subjectCode: fromTask.subjectCode,
+//           userId: reviewerId,
+//           questiondefinitionId: fromTask.questiondefinitionId, // critical
+//           totalBooklets: 0,
+//           status: "inactive",
+//           currentFileIndex: 1,
+//         });
+
+//         await toTask.save({ session });
+//       }
+//     }
+
+//     // 🔹 FETCH ONLY PENDING (status:false) PDFs
+//     const pendingPdfs = await AnswerPdf.find({
+//       taskId: fromTask._id,
+//       status: { $in: ["false", "progress"] },
+//     })
+//       .limit(Number(transferCount))
+//       .session(session);
+
+//     console.log("pending pdfs", pendingPdfs.length);
+
+//     if (pendingPdfs.length < transferCount) {
+//       return res.status(400).json({
+//         message: "Not enough pending booklets to reassign",
+//       });
+//     }
+
+//     const transferredPdfNames = [];
+
+//     // 🔁 MOVE BOOKLETS
+//     for (const pdf of pendingPdfs) {
+//       pdf.taskId = toTask._id;
+//       pdf.assignedDate = new Date();
+//       await pdf.save({ session });
+
+//       transferredPdfNames.push(pdf.answerPdfName);
+//     }
+
+//     // 🔢 UPDATE COUNTS
+//     fromTask.totalBooklets -= pendingPdfs.length;
+//     toTask.totalBooklets += pendingPdfs.length;
+
+//     await fromTask.save({ session });
+//     await toTask.save({ session });
+
+//     // 🧾 LOG HISTORY
+//     await BookletReassignment.create(
+//       [
+//         {
+//           subjectCode: fromTask.subjectCode,
+//           fromUserId: fromTask.userId,
+//           toUserId,
+//           fromTaskId: fromTask._id,
+//           toTaskId: toTask._id,
+//           transferredCount: pendingPdfs.length,
+//           transferredPdfNames,
+//           reassignedBy,
+//         },
+//       ],
+//       { session },
+//     );
+
+//     await session.commitTransaction();
+//     session.endSession();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: `${pendingPdfs.length} pending booklets reassigned successfully`,
+//       transferredPdfNames,
+//     });
+//   } catch (error) {
+//     await session.abortTransaction();
+//     session.endSession();
+
+//     console.error("Reassignment failed:", error);
+//     return res.status(500).json({
+//       message: "Failed to reassign booklets",
+//     });
+//   }
+// };
+
 const reassignPendingBooklets = async (req, res) => {
   const { fromTaskId, toUserId, transferCount, reassignedBy } = req.body;
 
-  console.log("Reassignment request:", req.body);
+  if (
+    !fromTaskId ||
+    !toUserId ||
+    !transferCount ||
+    Number(transferCount) <= 0
+  ) {
+    return res
+      .status(400)
+      .json({
+        message:
+          "Invalid payload: fromTaskId, toUserId, transferCount (positive number) required",
+      });
+  }
 
   const session = await mongoose.startSession();
 
   try {
-    session.startTransaction();
+    await session.startTransaction();
 
-    if (!fromTaskId || !toUserId || !transferCount || transferCount <= 0) {
-      return res.status(400).json({ message: "Invalid payload" });
-    }
-
-    // 🔹 SOURCE TASK
+    // 1. Load source task
     const fromTask = await Task.findById(fromTaskId).session(session);
-
     if (!fromTask) {
-      return res.status(404).json({ message: "Source task not found" });
+      throw new Error("Source task not found");
     }
 
-    // 🔒 RULE 1: Task must be inactive or active
-    if (!["inactive", "active", "success"].includes(fromTask.status)) {
-      return res.status(400).json({
-        message: "Completed task booklets cannot be reassigned",
-      });
+    // 2. Load target user (need role)
+    const toUser = await User.findById(toUserId).session(session);
+    if (!toUser) {
+      throw new Error("Target user not found");
     }
-    console.log("questiondefid:",fromTask.questiondefinitionId )
 
-    // 🔹 TARGET TASK (same subjectCode)
+    const isEvaluator = toUser.role === "evaluator";
+    const isReviewer = toUser.role === "reviewer";
+
+    if (!isEvaluator && !isReviewer) {
+      throw new Error("Target user must be 'evaluator' or 'reviewer'");
+    }
+
+    // 3. Role-specific validation on source task status
+    if (isEvaluator) {
+      if (!["inactive", "active"].includes(fromTask.status)) {
+        throw new Error(
+          "Evaluators can only receive from active or inactive tasks (not completed/success)",
+        );
+      }
+    } else if (isReviewer) {
+      if (fromTask.status !== "success") {
+        throw new Error(
+          "Reviewers can only receive from completed (success) tasks",
+        );
+      }
+    }
+
+    // 4. Find or create target task (same subject + same question definition)
     let toTask = await Task.findOne({
-      userId: toUserId,
+      userId: toUser._id,
       subjectCode: fromTask.subjectCode,
       questiondefinitionId: fromTask.questiondefinitionId,
-      status: { $ne: "success" },
     }).session(session);
 
     if (!toTask) {
       toTask = new Task({
         subjectCode: fromTask.subjectCode,
+        userId: toUser._id,
         questiondefinitionId: fromTask.questiondefinitionId,
-        userId: toUserId,
         totalBooklets: 0,
-        status: "inactive",
+        status: "inactive", // reviewers usually start inactive too
         currentFileIndex: 1,
       });
       await toTask.save({ session });
     }
 
-    if (toUserId.role === "reviewer") {
-      // ← here toUserId is the populated user
+    // 5. Determine which PDFs to transfer (role decides status filter)
+    const statusFilter = isReviewer
+      ? ["true"] // completed → reviewer
+      : ["false", "progress"]; // pending/in-progress → evaluator
 
-       // extract the real ID
-
-      let toTask = await Task.findOne({
-        userId: toUserId,
-        subjectCode: fromTask.subjectCode,
-        questiondefinitionId: fromTask.questiondefinitionId
-      }).session(session);
-
-      if (!toTask) {
-        toTask = new Task({
-          subjectCode: fromTask.subjectCode,
-          userId: reviewerId,
-          questiondefinitionId: fromTask.questiondefinitionId, // critical
-          totalBooklets: 0,
-          status: "inactive",
-          currentFileIndex: 1,
-        });
-
-        await toTask.save({ session });
-      }
-    }
-
-    // 🔹 FETCH ONLY PENDING (status:false) PDFs
-    const pendingPdfs = await AnswerPdf.find({
+    const pdfsToTransfer = await AnswerPdf.find({
       taskId: fromTask._id,
-      status: { $in: ["false", "progress"] },
+      questiondefinitionId: fromTask.questiondefinitionId,
+      status: { $in: statusFilter },
     })
       .limit(Number(transferCount))
       .session(session);
 
-    console.log("pending pdfs", pendingPdfs.length);
-
-    if (pendingPdfs.length < transferCount) {
-      return res.status(400).json({
-        message: "Not enough pending booklets to reassign",
-      });
+    if (pdfsToTransfer.length < transferCount) {
+      throw new Error(
+        `Not enough booklets available. Found: ${pdfsToTransfer.length}, requested: ${transferCount}`,
+      );
     }
 
+    // 6. Transfer logic
     const transferredPdfNames = [];
 
-    // 🔁 MOVE BOOKLETS
-    for (const pdf of pendingPdfs) {
+    for (const pdf of pdfsToTransfer) {
+      const oldStatus = pdf.status;
+
+      // Optional: reset fields depending on role
+      if (isReviewer) {
+        pdf.status = "progress"; // reviewer starts reviewing
+        // pdf.rejectionReason = null;
+        // pdf.rejectedAt = null;
+        // pdf.evaluatedAt = null;         // if you want to force re-evaluation
+      } else {
+        // For evaluator → usually keep pending state
+        pdf.status = oldStatus; // or force "false" if you prefer
+      }
+
       pdf.taskId = toTask._id;
       pdf.assignedDate = new Date();
       await pdf.save({ session });
 
-      transferredPdfNames.push(pdf.answerPdfName);
+      transferredPdfNames.push({
+        name: pdf.answerPdfName,
+        previousStatus: oldStatus,
+        newStatus: pdf.status,
+      });
     }
 
-    // 🔢 UPDATE COUNTS
-    fromTask.totalBooklets -= pendingPdfs.length;
-    toTask.totalBooklets += pendingPdfs.length;
+    // 7. Update task counters
+    fromTask.totalBooklets = Math.max(
+      0,
+      fromTask.totalBooklets - pdfsToTransfer.length,
+    );
+    toTask.totalBooklets += pdfsToTransfer.length;
 
     await fromTask.save({ session });
     await toTask.save({ session });
 
-    // 🧾 LOG HISTORY
+    // 8. Optional audit log
     await BookletReassignment.create(
       [
         {
           subjectCode: fromTask.subjectCode,
           fromUserId: fromTask.userId,
-          toUserId,
+          toUserId: toUser._id,
           fromTaskId: fromTask._id,
           toTaskId: toTask._id,
-          transferredCount: pendingPdfs.length,
-          transferredPdfNames,
-          reassignedBy,
+          transferredCount: pdfsToTransfer.length,
+          transferredPdfNames: pdfsToTransfer.map((p) => p.answerPdfName),
+          reassignedBy: reassignedBy || null,
+          reassignedAt: new Date(),
+          transferType: isReviewer
+            ? "completed-to-review"
+            : "pending-to-evaluate",
         },
       ],
       { session },
     );
 
     await session.commitTransaction();
-    session.endSession();
 
     return res.status(200).json({
       success: true,
-      message: `${pendingPdfs.length} pending booklets reassigned successfully`,
-      transferredPdfNames,
+      message: `${pdfsToTransfer.length} booklets reassigned successfully`,
+      toRole: toUser.role,
+      transferredCount: pdfsToTransfer.length,
+      transferredItems: transferredPdfNames,
+      fromTaskId: fromTask._id.toString(),
+      toTaskId: toTask._id.toString(),
     });
   } catch (error) {
     await session.abortTransaction();
-    session.endSession();
-
-    console.error("Reassignment failed:", error);
-    return res.status(500).json({
-      message: "Failed to reassign booklets",
+    console.error("Reassignment error:", error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Reassignment failed",
     });
+  } finally {
+    session.endSession();
   }
 };
-
 const reassignBooklets = async (req, res) => {
   const { fromUserId, toUserId, subjectCode, transferCount, reassignedBy } =
     req.body;
@@ -1232,8 +1407,10 @@ const getUserCurrentTaskStatus = async (req, res) => {
     // 🔹 Fetch active & inactive tasks (exclude success)
     const tasks = await Task.find({
       userId,
-      status: { $ne: "success" },
+      // status: { $ne: "success" },
     });
+
+    console.log(tasks);
 
     if (tasks.length === 0) {
       return res.status(200).json({
@@ -1269,14 +1446,15 @@ const getUserCurrentTaskStatus = async (req, res) => {
 
       const completedBooklets = await AnswerPdf.countDocuments({
         taskId: task._id,
-        questiopndefinitionId: task.questiondefinitionId,
+        questiondefinitionId: task.questiondefinitionId,
         status: "true",
       });
+      console.log("completedBooklets:", completedBooklets);
 
       const pendingBooklets = await AnswerPdf.countDocuments({
         taskId: task._id,
         questiondefinitionId: task.questiondefinitionId,
-        status: "false",
+        $or: [{ status: "false" }, { status: "progress" }],
       });
 
       // 🔹 Latest assignment date
@@ -1647,8 +1825,7 @@ const getReviewerTask = async (req, res) => {
         task,
         status: "active",
         blocked: true,
-        message:
-          "this booklet is not yet evaluated",
+        message: "this booklet is not yet evaluated",
       });
     }
 
@@ -3459,7 +3636,7 @@ const completedBookletHandler = async (req, res) => {
           // maybe also: evaluatedBy: req.user._id
         },
       },
-      { new: true },                        
+      { new: true },
     );
     console.log("✅ Updated AnswerPdf status to true");
 
@@ -3612,7 +3789,7 @@ const rejectBooklet = async (req, res) => {
       return res.status(400).json({ message: "Invalid answerPdfId." });
     }
     await AnswerPdf.findByIdAndUpdate(answerPdfId, {
-      status: "rejected",
+      status: "reject",
       rejectionReason: reason,
       rejectedAt: rejectedAt ? new Date(rejectedAt) : new Date(),
     });
@@ -3647,7 +3824,7 @@ const reviewerRejectTask = async (req, res) => {
       },
       {
         $set: {
-          status: "false", // or better: "rejected", "pending", etc.
+          status: "reject", // or better: "rejected", "pending", etc.
           // rejectionReason: "Your comment here",   // ← add if you have it
           // rejectedAt: new Date(),
         },
@@ -3681,20 +3858,44 @@ const reviewerRejectTask = async (req, res) => {
 
 const getDataprincipalSide = async (req, res) => {
   try {
-    
-
-    const pdfDetails = await AnswerPdf.find({
-  status: "false"
+   const pdfDetails = await AnswerPdf.find({
+  status: "reject",
 })
-  .select("answerPdfName taskId questiondefinitionId status") // add fields you actually need
-  .sort({ assignedDate: -1 })           // newest first (optional but useful)
-  .lean();
+  .select("answerPdfName taskId questiondefinitionId status assignedDate")
+  .populate({
+    path: "questiondefinitionId",
+    select: "questionName schemaId",
+    populate: {
+      path: "schemaId",
+      select: "maxMarks",
+    },
+  })
+  .sort({ assignedDate: -1 })
+  .lean(); // faster, plain JS objects
+    //questionname , marks, allottedmarks
+
+    const pdfDetailsWithMarks = await Promise.all(
+  pdfDetails.map(async (pdf) => {
+    const marks = await Marks.findOne({
+      questiondefinitionId: pdf.questiondefinitionId?._id,
+    })
+      .select("allottedMarks")
+      .lean();
+
+    return {
+      ...pdf,
+      questionName: pdf.questiondefinitionId?.questionName || "",
+      totalMarks: pdf.questiondefinitionId?.schemaId?.maxMarks || 0,
+      allottedMarks: marks?.allottedMarks || 0,
+    };
+  }),
+);
+
+    console.log("pdfDetails",pdfDetailsWithMarks);
 
     return res.status(200).json({
-      sttatus: true,
-      data: {
-        pdfDetails,
-      },
+      status: true,
+      data: pdfDetailsWithMarks,
     });
   } catch (error) {
     console.error("Error in reviewerRejectTask:", error);
@@ -3707,119 +3908,119 @@ const getDataprincipalSide = async (req, res) => {
 };
 
 const assignReviewerRollbackTask = async (req, res) => {
-const { assignments } = req.body;
+  const { assignments } = req.body;
 
-if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
+  if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
     return res.status(400).json({ message: "No assignments provided" });
-}
+  }
 
-const session = await mongoose.startSession();
+  const session = await mongoose.startSession();
 
-try {
+  try {
     session.startTransaction();
 
     let totalAssigned = 0;
 
     for (const item of assignments) {
-     const {
+      const {
         evaluatorId,
         reviewerId,
         subjectCode,
         questiondefinitionId,
         bookletsToAssign, // array of AnswerPdf IDs
-     } = item;
+      } = item;
 
-     /* -------------------------------------------------------------------------- */
-     /*                             BASIC VALIDATION                             */
-     /* -------------------------------------------------------------------------- */
-     if (
+      /* -------------------------------------------------------------------------- */
+      /*                             BASIC VALIDATION                             */
+      /* -------------------------------------------------------------------------- */
+      if (
         !evaluatorId ||
         !reviewerId ||
         !subjectCode ||
         !questiondefinitionId ||
         !Array.isArray(bookletsToAssign) ||
         bookletsToAssign.length === 0
-     ) {
+      ) {
         throw new Error("Missing or invalid required fields");
-     }
+      }
 
-     /* -------------------------------------------------------------------------- */
-     /*                         UPSERT REVIEWER TASK                             */
-     /* -------------------------------------------------------------------------- */
-     let reviewerTask = await ReviewerTask.findOne({
+      /* -------------------------------------------------------------------------- */
+      /*                         UPSERT REVIEWER TASK                             */
+      /* -------------------------------------------------------------------------- */
+      let reviewerTask = await ReviewerTask.findOne({
         evaluatorId,
         reviewerId,
         subjectCode,
         questiondefinitionId,
-     }).session(session);
+      }).session(session);
 
-     if (!reviewerTask) {
+      if (!reviewerTask) {
         reviewerTask = new ReviewerTask({
-         evaluatorId,
-         reviewerId,
-         subjectCode,
-         questiondefinitionId,
-         totalBooklets: 0,
-         status: "inactive",
+          evaluatorId,
+          reviewerId,
+          subjectCode,
+          questiondefinitionId,
+          totalBooklets: 0,
+          status: "inactive",
         });
-     }
+      }
 
-     /* -------------------------------------------------------------------------- */
-     /*                     VALIDATE OLD ANSWER PDF IDS                             */
-     /* -------------------------------------------------------------------------- */
-     const oldAnswerPdfs = await AnswerPdf.find({
+      /* -------------------------------------------------------------------------- */
+      /*                     VALIDATE OLD ANSWER PDF IDS                             */
+      /* -------------------------------------------------------------------------- */
+      const oldAnswerPdfs = await AnswerPdf.find({
         _id: { $in: bookletsToAssign },
         questiondefinitionId,
         status: { $in: ["true", "progress"] },
-     }).session(session);
+      }).session(session);
 
-     if (oldAnswerPdfs.length !== bookletsToAssign.length) {
+      if (oldAnswerPdfs.length !== bookletsToAssign.length) {
         const foundIds = oldAnswerPdfs.map((p) => p._id.toString());
         const invalidIds = bookletsToAssign.filter(
-         (id) => !foundIds.includes(id),
+          (id) => !foundIds.includes(id),
         );
 
         throw new Error(
-         `Invalid or ineligible AnswerPdf IDs: ${invalidIds.join(", ")}`,
+          `Invalid or ineligible AnswerPdf IDs: ${invalidIds.join(", ")}`,
         );
-     }
+      }
 
-     /* -------------------------------------------------------------------------- */
-     /*                     PREVENT DUPLICATE REVIEW ASSIGNMENT                     */
-     /* -------------------------------------------------------------------------- */
-     const alreadySent = await AnswerPdf.findOne({
+      /* -------------------------------------------------------------------------- */
+      /*                     PREVENT DUPLICATE REVIEW ASSIGNMENT                     */
+      /* -------------------------------------------------------------------------- */
+      const alreadySent = await AnswerPdf.findOne({
         _id: { $in: bookletsToAssign },
         sentForReview: true,
-     }).session(session);
+      }).session(session);
 
-     if (alreadySent) {
+      if (alreadySent) {
         throw new Error("One or more booklets already sent for review");
-     }
+      }
 
-     /* -------------------------------------------------------------------------- */
-     /*                     MARK OLD PDFs AS SENT FOR REVIEW                     */
-     /* -------------------------------------------------------------------------- */
-     await AnswerPdf.updateMany(
+      /* -------------------------------------------------------------------------- */
+      /*                     MARK OLD PDFs AS SENT FOR REVIEW                     */
+      /* -------------------------------------------------------------------------- */
+      await AnswerPdf.updateMany(
         { _id: { $in: bookletsToAssign } },
         {
-         $set: {
+          $set: {
             sentForReview: true,
             reviewerId,
-         },
+          },
         },
         { session },
-     );
+      );
 
-     /* -------------------------------------------------------------------------- */
-     /*                     UPDATE REVIEWER TASK COUNT                             */
-     /* -------------------------------------------------------------------------- */
-     reviewerTask.totalBooklets += oldAnswerPdfs.length;
-     await reviewerTask.save({ session });
+      /* -------------------------------------------------------------------------- */
+      /*                     UPDATE REVIEWER TASK COUNT                             */
+      /* -------------------------------------------------------------------------- */
+      reviewerTask.totalBooklets += oldAnswerPdfs.length;
+      await reviewerTask.save({ session });
 
-     /* -------------------------------------------------------------------------- */
-     /*             🔥 CREATE NEW TASK FOR EVALUATOR (ROLLBACK)                 */
-     /* -------------------------------------------------------------------------- */
-     const newTask = new Task({
+      /* -------------------------------------------------------------------------- */
+      /*             🔥 CREATE NEW TASK FOR EVALUATOR (ROLLBACK)                 */
+      /* -------------------------------------------------------------------------- */
+      const newTask = new Task({
         subjectCode,
         userId: evaluatorId, // 🔁 evaluatorId → userId
         questiondefinitionId,
@@ -3830,45 +4031,45 @@ try {
         remainingTimeInSec: null,
         lastResumedAt: null,
         efficiency: [],
-     });
+      });
 
-     await newTask.save({ session });
+      await newTask.save({ session });
 
-     /* -------------------------------------------------------------------------- */
-     /*         🔁 CLONE ANSWER PDF + ANSWER PDF IMAGES (CRITICAL)             */
-     /* -------------------------------------------------------------------------- */
-     for (const oldPdf of oldAnswerPdfs) {
+      /* -------------------------------------------------------------------------- */
+      /*         🔁 CLONE ANSWER PDF + ANSWER PDF IMAGES (CRITICAL)             */
+      /* -------------------------------------------------------------------------- */
+      for (const oldPdf of oldAnswerPdfs) {
         // 🆕 NEW AnswerPdf
         const newAnswerPdf = new AnswerPdf({
-         taskId: newTask._id,
-         answerPdfName: oldPdf.answerPdfName,
-         questiondefinitionId: oldPdf.questiondefinitionId,
-         status: "false",
-         assignedDate: new Date(),
+          taskId: newTask._id,
+          answerPdfName: oldPdf.answerPdfName,
+          questiondefinitionId: oldPdf.questiondefinitionId,
+          status: "false",
+          assignedDate: new Date(),
         });
 
         await newAnswerPdf.save({ session });
 
         // 🖼️ Clone images for this PDF
         const oldImages = await AnswerPdfImage.find({
-         answerPdfId: oldPdf._id,
-         questiondefinitionId: oldPdf.questiondefinitionId,
+          answerPdfId: oldPdf._id,
+          questiondefinitionId: oldPdf.questiondefinitionId,
         }).session(session);
 
         if (oldImages.length > 0) {
-         const newImageDocs = oldImages.map((img) => ({
+          const newImageDocs = oldImages.map((img) => ({
             answerPdfId: newAnswerPdf._id, // 🔥 NEW AnswerPdf ID
             questiondefinitionId: img.questiondefinitionId,
             name: img.name,
             page: img.page,
             status: "notVisited",
-         }));
+          }));
 
-         await AnswerPdfImage.insertMany(newImageDocs, { session });
+          await AnswerPdfImage.insertMany(newImageDocs, { session });
         }
-     }
+      }
 
-     totalAssigned += oldAnswerPdfs.length;
+      totalAssigned += oldAnswerPdfs.length;
     }
 
     /* -------------------------------------------------------------------------- */
@@ -3877,22 +4078,22 @@ try {
     await session.commitTransaction();
 
     return res.status(201).json({
-     message: "Reviewer rollback processed successfully",
-     assignedCount: totalAssigned,
+      message: "Reviewer rollback processed successfully",
+      assignedCount: totalAssigned,
     });
-} catch (err) {
+  } catch (err) {
     if (session.inTransaction()) {
-     await session.abortTransaction();
+      await session.abortTransaction();
     }
 
     console.error("❌ Reviewer rollback error:", err);
 
     return res.status(500).json({
-     error: err.message,
+      error: err.message,
     });
-} finally {
+  } finally {
     session.endSession();
-}
+  }
 };
 
 export {
@@ -3916,5 +4117,5 @@ export {
   getReviewerTask,
   reviewerRejectTask,
   getDataprincipalSide,
-  assignReviewerRollbackTask
+  assignReviewerRollbackTask,
 };

@@ -58,11 +58,11 @@ const schemaSchema = new mongoose.Schema({
 
   PageofSupplement: {
     type: Number,
-    required: true,
+    // required: true,
   },
   numberOfSupplement: {
     type: Number,
-    required: true,
+    // required: true,
   },
   supplimentaryPdfPath: {
     type: String,

@@ -54,7 +54,7 @@ router.put("/completedbooklet/:answerpdfid/:userId", completedBookletHandler);
 
 router.post("/reviewer/rejectTask", reviewerRejectTask);
 
-router.get("/get/principalsideData", getDataprincipalSide)
+router.get("/get/principalsideData", getDataprincipalSide);
 
 router.post("/assign/reviewer-rollback", assignReviewerRollbackTask);
 
