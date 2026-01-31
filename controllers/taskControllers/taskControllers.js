@@ -20,6 +20,7 @@ import Subject from "../../models/classModel/subjectModel.js";
 import SubjectFolderModel from "../../models/StudentModels/subjectFolderModel.js";
 import Icon from "../../models/EvaluationModels/iconModel.js";
 import { subjectsWithTasks } from "../classControllers/subjectControllers.js";
+import ReviewerTask from "../../models/taskModels/reviewerTaskModel.js"
 // import { ConversationsMessageFile } from "sib-api-v3-sdk";
 
 // const extractQuestionImages = async (
@@ -710,6 +711,7 @@ const assigningTask = async (req, res) => {
       if (task) {
         task.questiondefinitionId = questiondefinitionId;
         task.totalBooklets += pdfsToBeAssigned.length;
+        task.status = "inactive"
       } else {
         task = new Task({
           subjectCode,
@@ -822,17 +824,20 @@ const reassignPendingBooklets = async (req, res) => {
         message: "Completed task booklets cannot be reassigned",
       });
     }
+    console.log("questiondefid:",fromTask.questiondefinitionId )
 
     // 🔹 TARGET TASK (same subjectCode)
     let toTask = await Task.findOne({
       userId: toUserId,
       subjectCode: fromTask.subjectCode,
+      questiondefinitionId: fromTask.questiondefinitionId,
       status: { $ne: "success" },
     }).session(session);
 
     if (!toTask) {
       toTask = new Task({
         subjectCode: fromTask.subjectCode,
+        questiondefinitionId: fromTask.questiondefinitionId,
         userId: toUserId,
         totalBooklets: 0,
         status: "inactive",
@@ -849,6 +854,7 @@ const reassignPendingBooklets = async (req, res) => {
       let toTask = await Task.findOne({
         userId: toUserId,
         subjectCode: fromTask.subjectCode,
+        questiondefinitionId: fromTask.questiondefinitionId
       }).session(session);
 
       if (!toTask) {
@@ -1642,7 +1648,7 @@ const getReviewerTask = async (req, res) => {
         status: "active",
         blocked: true,
         message:
-          "Ye question pehle se kisi aur evaluator ko assigned hai aur uska task abhi complete nahi hua.",
+          "this booklet is not yet evaluated",
       });
     }
 
@@ -3453,7 +3459,7 @@ const completedBookletHandler = async (req, res) => {
           // maybe also: evaluatedBy: req.user._id
         },
       },
-      { new: true },
+      { new: true },                        
     );
     console.log("✅ Updated AnswerPdf status to true");
 
@@ -3700,6 +3706,195 @@ const getDataprincipalSide = async (req, res) => {
   }
 };
 
+const assignReviewerRollbackTask = async (req, res) => {
+const { assignments } = req.body;
+
+if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
+    return res.status(400).json({ message: "No assignments provided" });
+}
+
+const session = await mongoose.startSession();
+
+try {
+    session.startTransaction();
+
+    let totalAssigned = 0;
+
+    for (const item of assignments) {
+     const {
+        evaluatorId,
+        reviewerId,
+        subjectCode,
+        questiondefinitionId,
+        bookletsToAssign, // array of AnswerPdf IDs
+     } = item;
+
+     /* -------------------------------------------------------------------------- */
+     /*                             BASIC VALIDATION                             */
+     /* -------------------------------------------------------------------------- */
+     if (
+        !evaluatorId ||
+        !reviewerId ||
+        !subjectCode ||
+        !questiondefinitionId ||
+        !Array.isArray(bookletsToAssign) ||
+        bookletsToAssign.length === 0
+     ) {
+        throw new Error("Missing or invalid required fields");
+     }
+
+     /* -------------------------------------------------------------------------- */
+     /*                         UPSERT REVIEWER TASK                             */
+     /* -------------------------------------------------------------------------- */
+     let reviewerTask = await ReviewerTask.findOne({
+        evaluatorId,
+        reviewerId,
+        subjectCode,
+        questiondefinitionId,
+     }).session(session);
+
+     if (!reviewerTask) {
+        reviewerTask = new ReviewerTask({
+         evaluatorId,
+         reviewerId,
+         subjectCode,
+         questiondefinitionId,
+         totalBooklets: 0,
+         status: "inactive",
+        });
+     }
+
+     /* -------------------------------------------------------------------------- */
+     /*                     VALIDATE OLD ANSWER PDF IDS                             */
+     /* -------------------------------------------------------------------------- */
+     const oldAnswerPdfs = await AnswerPdf.find({
+        _id: { $in: bookletsToAssign },
+        questiondefinitionId,
+        status: { $in: ["true", "progress"] },
+     }).session(session);
+
+     if (oldAnswerPdfs.length !== bookletsToAssign.length) {
+        const foundIds = oldAnswerPdfs.map((p) => p._id.toString());
+        const invalidIds = bookletsToAssign.filter(
+         (id) => !foundIds.includes(id),
+        );
+
+        throw new Error(
+         `Invalid or ineligible AnswerPdf IDs: ${invalidIds.join(", ")}`,
+        );
+     }
+
+     /* -------------------------------------------------------------------------- */
+     /*                     PREVENT DUPLICATE REVIEW ASSIGNMENT                     */
+     /* -------------------------------------------------------------------------- */
+     const alreadySent = await AnswerPdf.findOne({
+        _id: { $in: bookletsToAssign },
+        sentForReview: true,
+     }).session(session);
+
+     if (alreadySent) {
+        throw new Error("One or more booklets already sent for review");
+     }
+
+     /* -------------------------------------------------------------------------- */
+     /*                     MARK OLD PDFs AS SENT FOR REVIEW                     */
+     /* -------------------------------------------------------------------------- */
+     await AnswerPdf.updateMany(
+        { _id: { $in: bookletsToAssign } },
+        {
+         $set: {
+            sentForReview: true,
+            reviewerId,
+         },
+        },
+        { session },
+     );
+
+     /* -------------------------------------------------------------------------- */
+     /*                     UPDATE REVIEWER TASK COUNT                             */
+     /* -------------------------------------------------------------------------- */
+     reviewerTask.totalBooklets += oldAnswerPdfs.length;
+     await reviewerTask.save({ session });
+
+     /* -------------------------------------------------------------------------- */
+     /*             🔥 CREATE NEW TASK FOR EVALUATOR (ROLLBACK)                 */
+     /* -------------------------------------------------------------------------- */
+     const newTask = new Task({
+        subjectCode,
+        userId: evaluatorId, // 🔁 evaluatorId → userId
+        questiondefinitionId,
+        totalBooklets: oldAnswerPdfs.length,
+        status: "inactive",
+        currentFileIndex: 1,
+        startTime: null,
+        remainingTimeInSec: null,
+        lastResumedAt: null,
+        efficiency: [],
+     });
+
+     await newTask.save({ session });
+
+     /* -------------------------------------------------------------------------- */
+     /*         🔁 CLONE ANSWER PDF + ANSWER PDF IMAGES (CRITICAL)             */
+     /* -------------------------------------------------------------------------- */
+     for (const oldPdf of oldAnswerPdfs) {
+        // 🆕 NEW AnswerPdf
+        const newAnswerPdf = new AnswerPdf({
+         taskId: newTask._id,
+         answerPdfName: oldPdf.answerPdfName,
+         questiondefinitionId: oldPdf.questiondefinitionId,
+         status: "false",
+         assignedDate: new Date(),
+        });
+
+        await newAnswerPdf.save({ session });
+
+        // 🖼️ Clone images for this PDF
+        const oldImages = await AnswerPdfImage.find({
+         answerPdfId: oldPdf._id,
+         questiondefinitionId: oldPdf.questiondefinitionId,
+        }).session(session);
+
+        if (oldImages.length > 0) {
+         const newImageDocs = oldImages.map((img) => ({
+            answerPdfId: newAnswerPdf._id, // 🔥 NEW AnswerPdf ID
+            questiondefinitionId: img.questiondefinitionId,
+            name: img.name,
+            page: img.page,
+            status: "notVisited",
+         }));
+
+         await AnswerPdfImage.insertMany(newImageDocs, { session });
+        }
+     }
+
+     totalAssigned += oldAnswerPdfs.length;
+    }
+
+    /* -------------------------------------------------------------------------- */
+    /*                             COMMIT TRANSACTION                             */
+    /* -------------------------------------------------------------------------- */
+    await session.commitTransaction();
+
+    return res.status(201).json({
+     message: "Reviewer rollback processed successfully",
+     assignedCount: totalAssigned,
+    });
+} catch (err) {
+    if (session.inTransaction()) {
+     await session.abortTransaction();
+    }
+
+    console.error("❌ Reviewer rollback error:", err);
+
+    return res.status(500).json({
+     error: err.message,
+    });
+} finally {
+    session.endSession();
+}
+};
+
 export {
   assigningTask,
   reassignPendingBooklets,
@@ -3721,4 +3916,5 @@ export {
   getReviewerTask,
   reviewerRejectTask,
   getDataprincipalSide,
+  assignReviewerRollbackTask
 };

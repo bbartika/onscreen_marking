@@ -22,7 +22,8 @@ import {
     getReviewerTask,
 
     reviewerRejectTask,
-    getDataprincipalSide
+    getDataprincipalSide,
+    assignReviewerRollbackTask
     // generatePdfForCompletedBooklet
 } from "../../controllers/taskControllers/taskControllers.js";
 
@@ -54,6 +55,8 @@ router.put("/completedbooklet/:answerpdfid/:userId", completedBookletHandler);
 router.post("/reviewer/rejectTask", reviewerRejectTask);
 
 router.get("/get/principalsideData", getDataprincipalSide)
+
+router.post("/assign/reviewer-rollback", assignReviewerRollbackTask);
 
 // router.post("/completeBooklet/generatePdf/:answerPdfId", generatePdfForCompletedBooklet);
 
